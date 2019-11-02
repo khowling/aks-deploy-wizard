@@ -1,26 +1,25 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
 
-function App() {
+import PortalNav from './components/portalnav'
+import { Stack, Text, FontWeights } from 'office-ui-fabric-react';
+
+const boldStyle = {
+  root: { fontWeight: FontWeights.semibold }
+};
+
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    <Stack verticalFill
+    styles={{ root: { width: '960px', margin: '0 auto', color: '#605e5c'}}}
+    gap={15}
+  >
+
+      <Text variant="xLarge" styles={boldStyle}>
+        Welcome to AKS Deploy
+      </Text>
+      <Text variant="large">Tell us the requirements of your AKS deployment, and we will generate the configuration to create your cluster, incorporating all Microsoft's best-practics guidence </Text>
+      <PortalNav/>
+    </Stack>
+  )
 }
 
-export default App;
