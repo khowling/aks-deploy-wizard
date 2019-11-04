@@ -68,12 +68,10 @@ export default function PortalNav () {
 
     function mergeState (fn, state,  key, val) {
       fn(Object.assign({}, state, {[key]: val}))
-      console.log (state)
     }
     
     function invalidFn(page, key, invalid) {
       let akey = page+"-"+key
-      console.log (invalidArray)
       if (!invalid && invalidArray.includes(akey))  {
         setInvalidArray( invalidArray.filter((v) => v !== akey))
       } else if (invalid && !invalidArray.includes(akey)) {
@@ -97,7 +95,7 @@ export default function PortalNav () {
           </PivotItem>
           <PivotItem headerText="Advanced Connectivity" itemKey="2" headerButtonProps={{disabled: !app.connectivity}} itemIcon={!app.connectivity ? 'StatusCircleBlock' : 'PlugDisconnected'}>
             <Separator/>
-            <NetworkScreen vals={net} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
+            <NetworkScreen vals={net} app={app} cluster={cluster} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
             <Separator/>
           </PivotItem>
           <PivotItem headerText="Deploy" itemKey="3">
@@ -106,8 +104,9 @@ export default function PortalNav () {
             <Separator/>
           </PivotItem>
         </Pivot>
-        
-        <DefaultButton disabled={invalidArray.length>0} onClick={_next}>Next</DefaultButton>
+        { key !== "3"  &&
+          <DefaultButton  disabled={invalidArray.length>0} onClick={_next}>Next</DefaultButton>
+        }
       </div>
 
     )
@@ -117,14 +116,23 @@ function DeployScreen({net,app,cluster, invalidArray}) {
 
   const [name, setName] = useState("")
   const [location,setLocation] = useState("westeurope")
-
+  const [demoapp,setDemoapp] = useState(false)
+  
+  let deploy_version = "v1.6"
+  var queryString = window && window.location.search
+  if (queryString) {
+    var match = queryString.match('[?&]' + 'v' + '=([^&]+)')
+    if (match) {
+      deploy_version = match[1]
+    }
+  }
 
   let aad_cmd = cluster.useAad ? "-t " +  (cluster.useAltAad ?  cluster.aadid : "current") : ""
   let features = (app.podscale ? " -a podscale " : "") + (app.podid ? "-a podid " :"" ) +  (app.flexvol ? "-a flexvol " :"" ) + (app.ingress !== 'none' ? (` -a ${app.ingress} ` + (app.dns ? ` -a dns=${app.dnsZone.split("/")[4]+"/"+app.dnsZone.split("/")[8]}`: "") + (app.certMan ? ` -a cert=${app.certEmail}`: "")) : "") + (cluster.securityLevel === "high" ? " -a private-api podsec calico afw " : "") + (cluster.connectivity ? " -a vnet " : "") + (net.topology !== 'none' ? net.topology : "") + (cluster.reboot ? " -a kured " : "") + (cluster.autoscale ? ` -a clustrautoscaler=${cluster.nodemax} ` : "") + (cluster.monitor !== 'none' ? " -a aci " : "") + (app.registry !== 'none' ? " -a acr " : "")
 
-  let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/v1.6 | \\
+  let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
     tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
-    ./deploy.sh -l ${location} ${net.kubenet ? " -n kubenet " : ""} -c ${cluster.nodeinit} ${cluster.vmsku !== 'default' ? "-v " + cluster.vmsku: ""} ${cluster.osdisk >0 ? "-o " + cluster.osdisk: ""} ${aad_cmd}  \\
+    ./deploy.sh -l ${location} ${net.kubenet ? " -n kubenet " : ""} -c ${cluster.nodeinit} ${cluster.vmsku !== 'default' ? "-v " + cluster.vmsku: ""} ${cluster.osdisk >0 ? "-o " + cluster.osdisk: ""} ${demoapp ? "-d" : ""} ${aad_cmd}  \\
     ${features} \\
     ${name} )`
 
@@ -143,11 +151,18 @@ function DeployScreen({net,app,cluster, invalidArray}) {
                   ]}
                   styles={{ dropdown: { width: 300 } }}
                 />
-
+      { (app.ingress === 'none' || !app.dns || !app.certMan) && 
+        <MessageBar  messageBarType={MessageBarType.warning}>To Get the option of deploying a <b>Demo Ecommerce App</b>, go tp the <b>Application Requirements</b> tab, and select an ingress option (Application Gateway or Nginx), and complete the FQDN and Certificate options</MessageBar> 
+      }
+      <Toggle
+          disabled={ (app.ingress === 'none' || !app.dns || !app.certMan)}
+          label={<Text>Do you want to install the <Link target="_a" href="https://github.com/khowling/aks-ecomm-demo/tree/master/ecom-fe">Ecommerce demo app</Link> into your cluster with a HTTPS FQDN exposed through an Ingress controller</Text>}
+          checked={demoapp} onText="Yes" offText="No" onChange={(ev, checked) => setDemoapp(checked)} />            
       <Separator/>
 
       <Text variant="large" >Open a Linux shell (requires 'az cli', 'kubectl' & 'helm' pre-installed), or, open the Azure Cloud Shell. <Text variant="large" style={{fontWeight: "bold"}}>Paste the code below</Text> into the shell</Text>
       <TextField label="Command" multiline rows={5} disabled value={deploy_str} errorMessage={invalidname || invalidArray.length>0 ? "Please fix errors before running script" : ""}/>
+    
     </Stack>
   )
 }
@@ -156,7 +171,6 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
 
   const [callout, setCallout] = useState(false)
   var _calloutTarget = React.createRef()
-
 
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
@@ -323,13 +337,13 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
             <ChoiceGroup defaultSelectedKey={vals.autoscale} onChange={(ev, {key}) => updateFn("autoscale", key) }
               options={[
                 {
-                  key: true,
-                  iconProps: { iconName: 'ScaleVolume' },
-                  text: 'Autoscale'
-                },{
                   key: false,
                   iconProps: { iconName: 'FollowUser' },
                   text: 'Manual scale'
+                },{
+                  key: true,
+                  iconProps: { iconName: 'ScaleVolume' },
+                  text: 'Autoscale'
                 }
               ]}/>
           </Stack.Item>
@@ -375,7 +389,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
         <Stack.Item>
           <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 250 } }}>
               <Dropdown
-                  label="Agent VM size"
+                  
                   selectedKey={vals.vmsku}
                   onChange={(ev,{key}) => updateFn("vmsku", key)}
                   placeholder="Select VM Size"
@@ -608,7 +622,7 @@ function AppScreen ({vals, updateFn, invalidFn}) {
 
 
 
-function NetworkScreen ({vals, updateFn, invalidFn}) {
+function NetworkScreen ({vals, updateFn, invalidFn, app, cluster}) {
 
   const [callout, setCallout] = useState(false)
   var _calloutTarget = React.createRef()
@@ -708,8 +722,8 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
       <Toggle
           label="Do you need to limit your non-routable IP usage on your network (use network calculator)"
           checked={vals.kubenet}
-          onText="Yes - Using 'kubenet' so your PODs do not receive VNET IPs"
-          offText="No - Using 'CNI' for fast container networking"
+          onText="Yes - Use 'kubenet' so your PODs do not receive VNET IPs"
+          offText="No - Use 'CNI' for fastest container networking"
           onChange={(ev, checked) => updateFn("kubenet", checked) }
          // styles={{ label: {fontWeight: "regular"}}}
         />
@@ -727,20 +741,20 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
             <TextField prefix="Subnet" label="LoadBalancer Services" onChange={(ev,val) => updateFn("ilbsub", val)} value={vals.ilbsub}  />
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" label="Azure Firewall" onChange={(ev,val) => updateFn("afwsub", val)} value={vals.afwsub}/>
+            <TextField prefix="Subnet" disabled={cluster.securityLevel === 'normal'}  label="Azure Firewall" onChange={(ev,val) => updateFn("afwsub", val)} value={cluster.securityLevel !== 'normal' ? vals.afwsub : "N/A"}/>
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" label="On-Premises Gateway" onChange={(ev,val) => updateFn("ersub", val)} value={vals.ersub} />
+            <TextField prefix="Subnet" disabled={vals.topology !== 'onprem'} label="On-Premises Gateway" onChange={(ev,val) => updateFn("ersub", val)} value={vals.topology === 'onprem' ? vals.ersub : "N/A"} />
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" label="Application Gateway" onChange={(ev,val) => updateFn("agsub", val)} disabled value={vals.agsub} />
+            <TextField prefix="Subnet" disabled={app.ingress !== 'appgw'} label="Application Gateway" onChange={(ev,val) => updateFn("agsub", val)} value={app.ingress === 'appgw' ? vals.agsub : "N/A"} />
           </Stack.Item>
         </Stack>
 
         <Stack {...columnProps}>
           <Label>Kubernetes Networking CIDRs</Label>
           <Stack.Item align="start">
-            <TextField  label="POD Network" onChange={(ev,val) => updateFn("pod", val)} value={vals.pod} />
+            <TextField  label="POD Network" disabled={!vals.kubenet} onChange={(ev,val) => updateFn("pod", val)} value={vals.kubenet ? vals.pod : "N/A"} />
           </Stack.Item>
           <Stack.Item align="start">
             <TextField  label="Service Network" onChange={(ev,val) => updateFn("service", val)} value={vals.service} />
