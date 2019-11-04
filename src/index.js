@@ -5,13 +5,13 @@ import App from './App';
 import * as serviceWorker from './serviceWorker';
 
 //import { loadTheme } from 'office-ui-fabric-react';
-//import { mergeStyles } from 'office-ui-fabric-react';
+import { mergeStyles } from 'office-ui-fabric-react';
 
 import { initializeIcons } from '@uifabric/icons';
 initializeIcons();
 
 // Inject some global styles
-/*
+
 mergeStyles({
   selectors: {
     ':global(body), :global(html), :global(#app)': {
@@ -21,7 +21,7 @@ mergeStyles({
     }
   }
 });
-*/
+
 
 /*
 loadTheme({

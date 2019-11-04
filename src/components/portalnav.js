@@ -16,79 +16,154 @@ const optionRootClass = mergeStyles({
 
 export default function PortalNav () {
     const [key, setKey] = useState("0")
+    const [invalidArray, setInvalidArray] = useState([])
+    const [cluster, setCluster] = useState({
+        sec: "normal",
+        autoscale: true,
+        nodeinit: 2,
+        nodemax: 20,
+        vmsku: "Standard_D2s_v3",
+        osdisk: 32,
+        useAad: false,
+        useAltAad: false,
+        aadid: "",
+        mon: "none",
+        reboot: false
+    })
+    const [app, setApp] = useState({
+      appVnet: false,
+      ingress: 'none',
+      certMan: false,
+      certEmail: "",
+      dns: false,
+      dnsZone: "",
+      reg: 'none',
+      flexvol: false,
+      podid: false,
+      podscale: false
+    })
+    const [net, setNet] = useState({
+      topology: 'none',
+      kubenet: false,
+      vnet: "10.0.0.0/8",
+      akssub: "10.240.0.0/16",
+      ilbsub: "10.241.0.0/24",
+      afwsub: "10.241.0.0/24",
+      ersub: "10.242.0.0/24",
+      agsub: "10.241.0.0/24",
+      pod: "10.244.0.0/16",
+      service:"10.0.0.0/16"
+    })
+
 
     function _handleLinkClick (item) {
         setKey(item.props.itemKey)
     }
     function _next () {
-      setKey(String((key + 1) % 4))
+      let curr_key = Number(key)
+      let nxt_key = (curr_key + 1) % 4
+      if (nxt_key === 2 && app.appVnet === false) nxt_key=3
+      setKey(String(nxt_key))
+    }
+
+    function mergeState (fn, state,  key, val) {
+      fn(Object.assign({}, state, {[key]: val}))
+      console.log (state)
     }
     
+    function invalidFn(page, key, invalid) {
+      let akey = page+"-"+key
+      console.log (invalidArray)
+      if (!invalid && invalidArray.includes(akey))  {
+        setInvalidArray( invalidArray.filter((v) => v !== akey))
+      } else if (invalid && !invalidArray.includes(akey)) {
+        setInvalidArray(invalidArray.concat(akey))
+      }
+    }
 
     return (
       <div>
         <Pivot selectedKey={key} onLinkClick={_handleLinkClick}>
           
-          <PivotItem headerText="Cluster" itemKey="0">
+          <PivotItem headerText="Cluster Requirements" itemKey="0">
             <Separator/>
-            <ClusterScreen/>
+            <ClusterScreen vals={cluster} updateFn={(key, val) => mergeState (setCluster, cluster, key, val)} invalidFn={(key, val) => invalidFn("cluster", key, val)} />
             <Separator/>
             </PivotItem>
-          <PivotItem headerText="Application" itemKey="1" >
+          <PivotItem headerText="Application Requirements" itemKey="1" >
             <Separator/>
-            <AppScreen/>
-            <Separator/>
-          </PivotItem>
-          <PivotItem headerText="Advanced Connectivity" itemKey="3" >
-            <Separator/>
-            <NetworkScreen/>
+            <AppScreen vals={app} updateFn={(key, val) => mergeState (setApp, app, key, val)} invalidFn={(key, val) => invalidFn("app", key, val)} />
             <Separator/>
           </PivotItem>
-
-          <PivotItem headerText="Deploy" itemKey="4">
+          <PivotItem headerText="Advanced Connectivity" itemKey="2" headerButtonProps={{disabled: !app.appVnet}} itemIcon={!app.appVnet ? 'ChromeClose' : 'CityNext'}>
             <Separator/>
+            <NetworkScreen vals={net} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
+            <Separator/>
+          </PivotItem>
+          <PivotItem headerText="Deploy" itemKey="3">
+            <Separator/>
+            <DeployScreen net={net} app={app} cluster={cluster}/>
             <Separator/>
           </PivotItem>
         </Pivot>
         
-        <DefaultButton onClick={_next}>Next</DefaultButton>
+        <DefaultButton disabled={invalidArray.length>0} onClick={_next}>Next</DefaultButton>
       </div>
 
     )
 }
 
-function ClusterScreen () {
+function DeployScreen({net,app,cluster}) {
+
+  const [name, setName] = useState("")
+  const [location,setLocation] = useState("westeurope")
+
+  
+  let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/v1.6 | \
+  tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \
+    ./deploy.sh -n azure -t current -a " kured  clustrautoscaler  aci  acr " ${name} )`
+
+
+  return (
+    <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
+      <TextField  label="Cluster Name" onChange={(ev,val) => setName(val)} value={name}  />
+      <Dropdown
+                  label="Location"
+                  selectedKey={location}
+                  onChange={(ev,{key}) => setLocation(key)}
+                  options={[
+                    { key: 'europe', text: 'Europe', itemType: DropdownMenuItemType.Header },
+                    { key: "westeurope", text: "West Europe" },
+                    { key: "uksouth", text: "UK South" }
+                  ]}
+                  styles={{ dropdown: { width: 300 } }}
+                />
+
+      <Separator/>
+
+      <TextField label="Command" multiline rows={3} disabled value={deploy_str} />
+    </Stack>
+  )
+}
+
+function ClusterScreen ({vals, updateFn, invalidFn}) {
 
   const [callout, setCallout] = useState(false)
-
-
-  const [sec, setSec] = useState("normal")
-  const [autoscale, setAutoscale] = useState(true)
-  const [vmsku, setVmsku] = useState("Standard_D2s_v3")
-  const [osdisk, setOsdisk] = useState(32)
-  const [useAad, setUseAad] = useState(false)
-  const [mon, setMon] = useState("none")
-  const [aadid, setAadId] = useState("")
-  const [reboot, setReboot] = useState(false)
-  
   var _calloutTarget = React.createRef()
 
 
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
 
-      <Text  variant="large"  styles={{ root: {  marginTop: "10px" }}}>
-      Tell us about the security, performance and feature requirements of your cluster
-      </Text>
         
       <Stack.Item align="start">
         <div ref={_calloutTarget}>
           <ChoiceGroup 
             
             label={<Label>Required Cluster Security Level <Link target="_" href="https://docs.microsoft.com/en-us/azure/aks/concepts-security">docs</Link></Label>}
-            defaultSelectedKey={sec}
+            defaultSelectedKey={vals.sec}
             onClick={() => setCallout(true)}
-            onChange={(ev, {key}) => {setSec(key); }}
+            onChange={(ev, {key}) => updateFn("sec", key) }
             options={[
               {
                 key: 'normal',
@@ -111,7 +186,7 @@ function ClusterScreen () {
         </div>
       </Stack.Item>
         
-      { callout && sec === "normal" && (
+      { callout && vals.sec === "normal" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -139,7 +214,7 @@ function ClusterScreen () {
       )}
 
 
-      { callout && sec === "high" && (
+      { callout && vals.sec === "high" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -166,13 +241,13 @@ function ClusterScreen () {
           </Callout>
       )}
         
-      <Separator/>
+      <Separator style={{marginTop: 0}}/>
 
-      <Stack horizontal tokens={{ childrenGap: 152 }}>
+      <Stack horizontal tokens={{ childrenGap: 142 }} style={ {marginTop: 0}}>
         <Stack.Item>
               <ChoiceGroup  label={ <Label>Cluster User Authentication <Link target="_" href="https://docs.microsoft.com/en-us/azure/aks/azure-ad-integration">docs</Link></Label>} 
-            defaultSelectedKey={useAad}
-            onChange={(ev, {key}) => {setUseAad(key); }}
+            defaultSelectedKey={vals.useAad}
+            onChange={(ev, {key}) => updateFn("useAad", key)}
             options={[
               {
                 key: false,
@@ -187,31 +262,32 @@ function ClusterScreen () {
             ]}/>
         </Stack.Item>
         <Stack.Item>
-        { useAad && (
+        { vals.useAad ? (
 
           <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 300 } }}>
 
             <ChoiceGroup
                   styles={{ root: { width: 300 } }}
-                  defaultSelectedKey="default"
+                  defaultSelectedKey={vals.useAltAad}
                   options={[
                     {
-                      key: 'default',
+                      key: false,
                       text: 'Use the AKS subscription tenant',
                     },
                     {
-                      key: 'B',
-                      text: 'Use alt tenant',
-                      ariaLabel: 'Mark displayed items as read after - Press tab for further action',
+                      key: true,
+                      text: 'Use alt. tenant',
                       onRenderField: (props, render) => {
-                        if (!props.checked) setAadId("")
+
+                        let invalid = vals.useAad && props.checked && vals.aadid.length !== 36
+                        invalidFn ("aadid", invalid)
                         return (
                           <div className={optionRootClass}>
                             {render(props)}
                             <TextField
-                            value={aadid}
-                            onChange={(ev, val) => setAadId(val)}
-                            errorMessage={ useAad && props.checked && aadid.length !== 36 ? "Enter Valid Directory ID" : ""}
+                            value={vals.aadid}
+                            onChange={(ev, val) => updateFn("aadid", val)}
+                            errorMessage={ invalid ?"Enter Valid Directory ID" : ""}
                             styles={{root: {marginLeft: 5}}}
                             disabled={props ? !props.checked : false}
                             required placeholder="tenant id" />
@@ -222,23 +298,23 @@ function ClusterScreen () {
                       }
                     }
                   ]}
-                  onChange={(ev, val) => console.log (val)}
-                  label="Requires Global Admin rights"
+                  onChange={(ev, val) => updateFn("useAltAad", val.key)}
+                  label={<MessageBar messageBarType={MessageBarType.warning}>Requires Global Admin rights</MessageBar>}
                 />
           </Stack>
-        )}
+        ) : invalidFn ("aadid", false) }
         </Stack.Item>
       </Stack>
 
       <Separator/>
 
 
-      <Label>Cluster Performance & Scale Requirements</Label>
+      <Label style={ {marginTop: 0}}>Cluster Performance & Scale Requirements</Label>
       <Stack vertical  tokens={{ childrenGap: 15 }} style={{marginTop: 0}} >
 
         <Stack horizontal tokens={{ childrenGap: 150 }}>
           <Stack.Item>
-            <ChoiceGroup defaultSelectedKey={autoscale} onChange={(ev, {key}) => {setAutoscale(key); }}
+            <ChoiceGroup defaultSelectedKey={vals.autoscale} onChange={(ev, {key}) => updateFn("autoscale", key) }
               options={[
                 {
                   key: true,
@@ -252,12 +328,12 @@ function ClusterScreen () {
               ]}/>
           </Stack.Item>
           <Stack.Item>
-            <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 250 } }}>
-              <Slider label="Initial nodes" min={1} max={10} step={1} defaultValue={2} showValue={true}
-                onChange={(value) => console.log(value)}/>
-            { autoscale && (
-              <Slider label="Max nodes" min={5} max={100} step={5} defaultValue={20} showValue={true}
-                onChange={(value) => console.log(value)}
+            <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 300 } }}>
+              <Slider label="Initial nodes" min={1} max={10} step={1} defaultValue={vals.nodeinit} showValue={true}
+                onChange={(v) => updateFn("nodeinit", v)}/>
+            { vals.autoscale && (
+              <Slider label="Max nodes" min={5} max={100} step={5} defaultValue={vals.nodemax} showValue={true}
+                onChange={(v) => updateFn("nodemax", v)}
                 snapToStep/>
             )}
           </Stack>
@@ -294,8 +370,8 @@ function ClusterScreen () {
           <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 250 } }}>
               <Dropdown
                   label="Agent VM"
-                  selectedKey={vmsku}
-                  onChange={(ev,{key}) => setVmsku(key)}
+                  selectedKey={vals.vmsku}
+                  onChange={(ev,{key}) => updateFn("vmsku", key)}
                   placeholder="Select VM Size"
                   options={[
                     { key: 'gp', text: 'General purpose', itemType: DropdownMenuItemType.Header },
@@ -307,8 +383,8 @@ function ClusterScreen () {
                 />
               <Dropdown
                   label="Agent OS disk"
-                  selectedKey={osdisk}
-                  onChange={(ev,{key}) => setOsdisk(key)}
+                  selectedKey={vals.osdisk}
+                  onChange={(ev,{key}) => updateFn("osdisk", key)}
                   placeholder="Select OS Disk"
                   options={[
                     { key: 'pd', text: 'Premium SSD Managed Disks', itemType: DropdownMenuItemType.Header },
@@ -322,10 +398,8 @@ function ClusterScreen () {
           </Stack>
         </Stack.Item>
       </Stack>
-      <Checkbox  checked={reboot} onChange={(ev,val) => setReboot(val)} label="Automatically reboot nodes after scheduled OS updates (kured)"  />
-       
+      <Checkbox  checked={vals.reboot} onChange={(ev,val) => updateFn("reboot",val)} label="Automatically reboot nodes after scheduled OS updates (kured)"  />
 
-      
       <Separator/>
 
       <Stack.Item align="start">
@@ -333,13 +407,13 @@ function ClusterScreen () {
         Cluster Monitoring requirements
         </Label>
         <ChoiceGroup
-          defaultSelectedKey={mon}
+          defaultSelectedKey={vals.mon}
           options={[
             { key: 'none', text: 'None, or I will deploy my own managed or oss solution' },
             { key: 'aci',text: 'Microsoft managed addon for for metrics and container logs (azure monitor)'}
             
           ]}
-          onChange={(ev, opt) => setMon (opt.key)}
+          onChange={(ev, opt) => updateFn("mon", opt.key)}
         />
       </Stack.Item>
 
@@ -354,35 +428,20 @@ const columnProps = {
     styles: { root: { width: 300 } }
 }
 
-function AppScreen () {
+function AppScreen ({vals, updateFn, invalidFn}) {
 
   const [callout, setCallout] = useState(false)
-
-  const [appVnet, setAppVnet] = useState(false)
-  const [ingress, setIngress] = useState('none')
-  const [certMan, setCertMan] = useState(false)
-  const [dns, setDns] = useState(false)
-  const [reg, setReg] = useState('none')
-  const [flexvol, setFlexvol] = useState(false)
-  const [podid, setPodid] = useState(false)
-  const [podscale, setPodscale] = useState(false)
-
   let _calloutTarget = React.createRef()
 
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
 
-      <Text  variant="large" styles={{ root: {  marginTop: "10px" }}}>
-      Tell us about the requirements of your applications to be deployed in the cluster
-      </Text>
-
-
       <Label>Select Default or Custom Networking Connectivity</Label>
       <div ref={_calloutTarget} style={{marginTop: 0, maxWidth: "220px"}}>
         <ChoiceGroup 
-          defaultSelectedKey={appVnet}
+          defaultSelectedKey={vals.appVnet}
           onClick={() => setCallout(true)}
-          onChange={(ev, {key}) => {setAppVnet(key); }}
+          onChange={(ev, {key}) => updateFn("appVnet", key)}
           options={[
             {
               key: false,
@@ -398,7 +457,7 @@ function AppScreen () {
         />
       </div>
     
-      { callout && !appVnet && (
+      { callout && !vals.appVnet && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -424,7 +483,7 @@ function AppScreen () {
       )}
 
 
-      { callout && appVnet && (
+      { callout && vals.appVnet && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -445,30 +504,63 @@ function AppScreen () {
         
       <Separator/>
 
-
-
-
       <Stack.Item align="start">
         <Label required={true}>
         Securely Expose your applications to the Internet via HTTPS
         </Label>
         <ChoiceGroup
-          defaultSelectedKey={ingress}
+          defaultSelectedKey={vals.ingress}
           options={[
             { key: 'none',text: 'No, applications will not be exposed, or, I will configure my own solution'},
             { key: 'nginx', text: 'Yes, deploy nginx in the cluster to expose my apps to the internet (nginx ingress controller)' },
             { key: 'appgw', text: 'Yes, deply an Azure Managed Gateway with WAF protection (Application Gateway) ($)' }
           ]}
-          onChange={(ev, opt) => setIngress (opt.key)}
+          onChange={(ev, opt) =>updateFn("ingress", opt.key)}
         />
       </Stack.Item>
 
-      <Stack.Item align="center" styles={{ root: {display: (ingress === "none" ? "none" : "block")}}} >
+      <Stack.Item align="center" styles={{ root: {display: (vals.ingress === "none" ? "none" : "block")}}} >
         <Stack tokens={{ childrenGap: 15 }}>
-          <Checkbox  checked={dns} onChange={(ev,val) => setDns(val)} label="Register DNS names for your applications (requires a Azure DNS Zone)" />
-          <TextField styles={{ root: {display: (dns ? "block" :  "none" )}}} label="Enter the ResourceGroup/Name of your Azure DNS Zone:" underlined required placeholder="rg/zone" />
-          <Checkbox  checked={certMan} onChange={(ev,val) => setCertMan(val)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email"  />
-          <TextField styles={{ root: {display: (certMan ? "block" :  "none" )}}} label="Enter mail address for certificate notification:" underlined required placeholder="email@address.com" />
+          <Checkbox  checked={vals.dns} onChange={(ev,v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires Azure DNS Zone <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t">instructions</Link>)</Text>} />
+          {((show) => {
+            //  styles={{ root: {display: (vals.dns ? "block" :  "none" )}}}
+           if (show) {
+            let invalid = true
+            if (vals.dnsZone && vals.dnsZone.length > 100) {
+              let resid_array = vals.dnsZone.split("/")
+              if (!(resid_array.length !== 9 || resid_array[1] !== "subscriptions" || resid_array[3] !== "resourceGroups" || resid_array[7] !== "dnszones" ||  resid_array[8].indexOf(".") <= 0)) {
+                invalid = false
+              }
+            }
+            invalidFn("certMan", invalid)
+            return (
+              <TextField value={vals.dnsZone} onChange={(ev,v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label={<Text>Enter the ResourceId of your Azure DNS Zone <Link target="_t" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">here</Link></Text>} />
+            )
+           } else {
+            invalidFn("certMan", false)
+           }
+          })(vals.dns)}
+          <Checkbox  checked={vals.certMan} onChange={(ev,v) =>  updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email"  />
+          {((show) => {
+            //  styles={{ root: {display: (vals.dns ? "block" :  "none" )}}}
+            if (show) {
+              let invalid = true
+              if (vals.certEmail && vals.certEmail.length > 4) {
+                let e_array = vals.certEmail.split("@")
+                if (!(e_array.length !== 2 || e_array[1] === "example.com" || e_array[1].indexOf(".") <= 0)) {
+                  invalid = false
+                }
+              }
+              invalidFn("certEmail", invalid)
+             return (
+              <TextField value={vals.certEmail} onChange={(ev,v) => updateFn("certEmail", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label="Enter mail address for certificate notification:" underlined required placeholder="email@address.com" />
+             )
+           } else {
+            invalidFn("certEmail", false)
+           }
+          })(vals.certMan)}
+          
+         
         </Stack>
       </Stack.Item>
 
@@ -479,12 +571,12 @@ function AppScreen () {
         Do you require a secure private container registry to store my application images
         </Label>
         <ChoiceGroup
-          defaultSelectedKey={reg}
+          defaultSelectedKey={vals.reg}
           options={[
             { key: 'none',text: 'No, my application images will be on dockerhub or another registry'},
             { key: 'acr', text: 'Yes, setup Azure Container Registry & secure access to the cluster ($)' }
           ]}
-          onChange={(ev, opt) => setReg (opt.key)}
+          onChange={(ev, {k}) => updateFn("reg",k)}
         />
       </Stack.Item>
 
@@ -495,9 +587,9 @@ function AppScreen () {
         </Label>
       <Stack.Item align="start">
         <Stack tokens={{ childrenGap: 10 }}>
-          <Checkbox  checked={flexvol} onChange={(ev,val) => setFlexvol(val)} label="Store kubernetes secrets/certs encrypted in Aure KeyVault  (Azure KeyVault + flexvol)" />
-          <Checkbox  checked={podid} onChange={(ev,val) => setPodid(val)} label="My application will operate with an identity secured by Azure AD to access other services (pod identity)"  />
-          <Checkbox  checked={podscale} onChange={(ev,val) => setPodscale(val)} label="Automatically set the 'requests'  based on usage and thus allow proper scheduling onto nodes (vertical-pod-autoscaler)"  />
+          <Checkbox  checked={vals.flexvol} onChange={(ev,val) => updateFn("flexvol",val)} label="Store kubernetes secrets/certs encrypted in Aure KeyVault  (Azure KeyVault + flexvol)" />
+          <Checkbox  checked={vals.podid} onChange={(ev,val) => updateFn("podid",val)} label="My application will operate with an identity secured by Azure AD to access other services (pod identity)"  />
+          <Checkbox  checked={vals.podscale} onChange={(ev,val) =>updateFn("podscale",val)} label="Automatically set the 'requests'  based on usage and thus allow proper scheduling onto nodes (vertical-pod-autoscaler)"  />
         </Stack>
       </Stack.Item>
 
@@ -507,30 +599,22 @@ function AppScreen () {
 
 
 
-function NetworkScreen () {
+function NetworkScreen ({vals, updateFn, invalidFn}) {
 
   const [callout, setCallout] = useState(false)
-  const [topology, setTopology] = useState ('none')
-  const [kubenet, setKubenet] = useState (false)
-  const [vnet, setVnet] = useState ("10.0.0.0/8")
-
   var _calloutTarget = React.createRef()
 
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
 
-      <Text  variant="large"  styles={{ root: {  marginTop: "10px" }}}>
-      Complete this Screen if you selected "Custom Networking" in application requiremetns
-      </Text>
-        
       <Stack.Item align="start">
         <div ref={_calloutTarget}>
           <ChoiceGroup 
             
             label={<Label>Select your Network Topology for Network connectivity</Label>}
-            defaultSelectedKey={topology}
+            defaultSelectedKey={vals.topology}
             onClick={() => setCallout(true)}
-            onChange={(ev, {key}) => {setTopology(key); }}
+            onChange={(ev, {key}) => updateFn("topology", key)}
             options={[
               {
                 key: 'none',
@@ -552,7 +636,7 @@ function NetworkScreen () {
         </div>
       </Stack.Item>
 
-      { callout && topology === "none" && (
+      { callout && vals.topology === "none" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -570,7 +654,7 @@ function NetworkScreen () {
             </div>
           </Callout>
       )}
-      { callout && topology === "er" && (
+      { callout && vals.topology === "er" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -590,7 +674,7 @@ function NetworkScreen () {
       )}
 
 
-      { callout && topology === "hs" && (
+      { callout && vals.topology === "hs" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -613,36 +697,46 @@ function NetworkScreen () {
     
       <Toggle
           label="Do you need to limit your non-routable IP usage on your network (use network calculator)"
-          checked={kubenet}
-          onText="Yes - switch to 'kubenet', so your PODs do not receive VNET IPs"
-          offText="No - continue to use CNI for fast container networking"
-          onChange={(ev, checked) => setKubenet(checked) }
+          checked={vals.kubenet}
+          onText="Yes - Using 'kubenet' so your PODs do not receive VNET IPs"
+          offText="No - Using 'CNI' for fast container networking"
+          onChange={(ev, checked) => updateFn("kubenet", checked) }
          // styles={{ label: {fontWeight: "regular"}}}
         />
 
       <Stack horizontal tokens={{ childrenGap: 50 }} styles={{ root: { width: 650 } }}>
-      <Stack {...columnProps}>
-          <TextField label="VNET CIDR"  value={vnet} onChange={(ev,val) => setVnet(val)} />
-
-          <TextField label="With an icon" iconProps={{ iconName: 'Calendar' }} />
-
-          <TextField label="With placeholder" placeholder="Please enter text here" />
-          <TextField label="Disabled with placeholder" disabled placeholder="I am disabled" />
+        <Stack {...columnProps}>
+          <Label>AKS Virtual Network & Subnet CIDRs</Label>
+          <Stack.Item align="start">
+            <TextField prefix="Vnet" onChange={(ev,val) => updateFn("vnet", val)} value={vals.vnet}  />
+          </Stack.Item>
+          <Stack.Item align="center">
+            <TextField prefix="Subnet" label="AKS Nodes" onChange={(ev,val) => updateFn("akssub", val)} value={vals.akssub}  />
+          </Stack.Item>
+          <Stack.Item align="center">
+            <TextField prefix="Subnet" label="LoadBalancer Services" onChange={(ev,val) => updateFn("ilbsub", val)} value={vals.ilbsub}  />
+          </Stack.Item>
+          <Stack.Item align="center">
+            <TextField prefix="Subnet" label="Azure Firewall" onChange={(ev,val) => updateFn("afwsub", val)} value={vals.afwsub}/>
+          </Stack.Item>
+          <Stack.Item align="center">
+            <TextField prefix="Subnet" label="On-Premises Gateway" onChange={(ev,val) => updateFn("ersub", val)} value={vals.ersub} />
+          </Stack.Item>
+          <Stack.Item align="center">
+            <TextField prefix="Subnet" label="Application Gateway" onChange={(ev,val) => updateFn("agsub", val)} disabled value={vals.agsub} />
+          </Stack.Item>
         </Stack>
 
         <Stack {...columnProps}>
-
-
-
-          <TextField label="Standard" />
-          <TextField label="Disabled" disabled defaultValue="I am disabled" />
-          <TextField label="Read-only" readOnly defaultValue="I am read-only" />
-          <TextField label="Required " required />
-          <TextField required />
-          <TextField label="With error message" errorMessage="Error message" />
+          <Label>Kubernetes Networking CIDRs</Label>
+          <Stack.Item align="start">
+            <TextField  label="POD Network" onChange={(ev,val) => updateFn("pod", val)} value={vals.pod} />
+          </Stack.Item>
+          <Stack.Item align="start">
+            <TextField  label="Service Network" onChange={(ev,val) => updateFn("service", val)} value={vals.service} />
+          </Stack.Item>
+         
         </Stack>
-
-        
       </Stack>
     </Stack>
   )
