@@ -18,26 +18,26 @@ export default function PortalNav () {
     const [key, setKey] = useState("0")
     const [invalidArray, setInvalidArray] = useState([])
     const [cluster, setCluster] = useState({
-        sec: "normal",
-        autoscale: true,
-        nodeinit: 2,
+        securityLevel: "normal",
+        autoscale: false,
+        nodeinit: 3,
         nodemax: 20,
-        vmsku: "Standard_D2s_v3",
-        osdisk: 32,
+        vmsku: "default",
+        osdisk: 0,
         useAad: false,
         useAltAad: false,
         aadid: "",
-        mon: "none",
+        monitor: "none",
         reboot: false
     })
     const [app, setApp] = useState({
-      appVnet: false,
+      connectivity: false,
       ingress: 'none',
       certMan: false,
       certEmail: "",
       dns: false,
       dnsZone: "",
-      reg: 'none',
+      registry: 'none',
       flexvol: false,
       podid: false,
       podscale: false
@@ -62,7 +62,7 @@ export default function PortalNav () {
     function _next () {
       let curr_key = Number(key)
       let nxt_key = (curr_key + 1) % 4
-      if (nxt_key === 2 && app.appVnet === false) nxt_key=3
+      if (nxt_key === 2 && app.connectivity === false) nxt_key=3
       setKey(String(nxt_key))
     }
 
@@ -95,14 +95,14 @@ export default function PortalNav () {
             <AppScreen vals={app} updateFn={(key, val) => mergeState (setApp, app, key, val)} invalidFn={(key, val) => invalidFn("app", key, val)} />
             <Separator/>
           </PivotItem>
-          <PivotItem headerText="Advanced Connectivity" itemKey="2" headerButtonProps={{disabled: !app.appVnet}} itemIcon={!app.appVnet ? 'ChromeClose' : 'CityNext'}>
+          <PivotItem headerText="Advanced Connectivity" itemKey="2" headerButtonProps={{disabled: !app.connectivity}} itemIcon={!app.connectivity ? 'StatusCircleBlock' : 'PlugDisconnected'}>
             <Separator/>
             <NetworkScreen vals={net} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
             <Separator/>
           </PivotItem>
           <PivotItem headerText="Deploy" itemKey="3">
             <Separator/>
-            <DeployScreen net={net} app={app} cluster={cluster}/>
+            <DeployScreen net={net} app={app} cluster={cluster} invalidArray={invalidArray}/>
             <Separator/>
           </PivotItem>
         </Pivot>
@@ -113,20 +113,25 @@ export default function PortalNav () {
     )
 }
 
-function DeployScreen({net,app,cluster}) {
+function DeployScreen({net,app,cluster, invalidArray}) {
 
   const [name, setName] = useState("")
   const [location,setLocation] = useState("westeurope")
 
-  
-  let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/v1.6 | \
-  tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \
-    ./deploy.sh -n azure -t current -a " kured  clustrautoscaler  aci  acr " ${name} )`
 
+  let aad_cmd = cluster.useAad ? "-t " +  (cluster.useAltAad ?  cluster.aadid : "current") : ""
+  let features = (app.podscale ? " -a podscale " : "") + (app.podid ? "-a podid " :"" ) +  (app.flexvol ? "-a flexvol " :"" ) + (app.ingress !== 'none' ? (` -a ${app.ingress} ` + (app.dns ? ` -a dns=${app.dnsZone.split("/")[4]+"/"+app.dnsZone.split("/")[8]}`: "") + (app.certMan ? ` -a cert=${app.certEmail}`: "")) : "") + (cluster.securityLevel === "high" ? " -a private-api podsec calico afw " : "") + (cluster.connectivity ? " -a vnet " : "") + (net.topology !== 'none' ? net.topology : "") + (cluster.reboot ? " -a kured " : "") + (cluster.autoscale ? ` -a clustrautoscaler=${cluster.nodemax} ` : "") + (cluster.monitor !== 'none' ? " -a aci " : "") + (app.registry !== 'none' ? " -a acr " : "")
 
+  let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/v1.6 | \\
+    tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
+    ./deploy.sh -l ${location} ${net.kubenet ? " -n kubenet " : ""} -c ${cluster.nodeinit} ${cluster.vmsku !== 'default' ? "-v " + cluster.vmsku: ""} ${cluster.osdisk >0 ? "-o " + cluster.osdisk: ""} ${aad_cmd}  \\
+    ${features} \\
+    ${name} )`
+
+  let invalidname = name.length <5
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
-      <TextField  label="Cluster Name" onChange={(ev,val) => setName(val)} value={name}  />
+      <TextField  label="Cluster Name" onChange={(ev,val) => setName(val)} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={name}  />
       <Dropdown
                   label="Location"
                   selectedKey={location}
@@ -141,7 +146,8 @@ function DeployScreen({net,app,cluster}) {
 
       <Separator/>
 
-      <TextField label="Command" multiline rows={3} disabled value={deploy_str} />
+      <Text variant="large" >Open a Linux shell (requires 'az cli', 'kubectl' & 'helm' pre-installed), or, open the Azure Cloud Shell. <Text variant="large" style={{fontWeight: "bold"}}>Paste the code below</Text> into the shell</Text>
+      <TextField label="Command" multiline rows={5} disabled value={deploy_str} errorMessage={invalidname || invalidArray.length>0 ? "Please fix errors before running script" : ""}/>
     </Stack>
   )
 }
@@ -161,9 +167,9 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
           <ChoiceGroup 
             
             label={<Label>Required Cluster Security Level <Link target="_" href="https://docs.microsoft.com/en-us/azure/aks/concepts-security">docs</Link></Label>}
-            defaultSelectedKey={vals.sec}
+            defaultSelectedKey={vals.securityLevel}
             onClick={() => setCallout(true)}
-            onChange={(ev, {key}) => updateFn("sec", key) }
+            onChange={(ev, {key}) => updateFn("securityLevel", key) }
             options={[
               {
                 key: 'normal',
@@ -186,7 +192,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
         </div>
       </Stack.Item>
         
-      { callout && vals.sec === "normal" && (
+      { callout && vals.securityLevel === "normal" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -204,7 +210,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
               <ul>
                 <li>Dedicated agent nodes in private VNET</li>
                 <li>Disk encryption with Storage Service Encryption (SSE)</li>
-                <li>Public api server endpoint with ip whitelist options</li>
+                <li>Public API Server endpoint with IP whitelist options</li>
                 <li>RBAC enabled cluster</li>
                 <li>Warning: no restictions on workloads accessing internet</li>
                 <li>Warning: no restictions on privileged workloads</li>
@@ -214,7 +220,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
       )}
 
 
-      { callout && vals.sec === "high" && (
+      { callout && vals.securityLevel === "high" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -231,7 +237,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
               </Text>
               <ul>
                 <li>East-West intra-cluster networking policies (calico)</li>
-                <li>(future) Private api server endpoint (requires jumpbox)</li>
+                <li>Fully private API Server endpoint (requires jumpbox)</li>
                 <li>Locked down workload internet access (azure firewall)</li>
                 <li>Restricted privileged & runasroot workloads (pod sec policy)</li>
                 <li>(future) Trusted containers and authorised deployments (gatekeeper)</li>
@@ -240,8 +246,8 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
             </div>
           </Callout>
       )}
-        
-      <Separator style={{marginTop: 0}}/>
+     
+      <Separator className="notopmargin"/>
 
       <Stack horizontal tokens={{ childrenGap: 142 }} style={ {marginTop: 0}}>
         <Stack.Item>
@@ -306,7 +312,7 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
         </Stack.Item>
       </Stack>
 
-      <Separator/>
+      <Separator className="notopmargin"/>
 
 
       <Label style={ {marginTop: 0}}>Cluster Performance & Scale Requirements</Label>
@@ -369,24 +375,26 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
         <Stack.Item>
           <Stack  tokens={{ childrenGap: 0 }} styles={{ root: { width: 250 } }}>
               <Dropdown
-                  label="Agent VM"
+                  label="Agent VM size"
                   selectedKey={vals.vmsku}
                   onChange={(ev,{key}) => updateFn("vmsku", key)}
                   placeholder="Select VM Size"
                   options={[
                     { key: 'gp', text: 'General purpose', itemType: DropdownMenuItemType.Header },
-                    { key: 'Standard_D2s_v3', text: '2 vCPU, 8 GB (Max.3200 IOPS)' },
+                    { key: 'default', text: '(D2s v3) 2 vCPU, 8 GB (Max.3200 IOPS)' },
                     { key: 'comp', text: 'Compute optimized', itemType: DropdownMenuItemType.Header },
-                    { key: 'Standard_F2s_v2', text: '2 vCPU, 4 GB (Max. 3200 IOPS)' },
+                    { key: 'Standard_F2s_v2', text: '(F2s v2) 2 vCPU, 4 GB (Max. 3200 IOPS)' },
                   ]}
                   styles={{ dropdown: { width: 300 } }}
                 />
               <Dropdown
-                  label="Agent OS disk"
+                  label="Agent OS disk size"
                   selectedKey={vals.osdisk}
                   onChange={(ev,{key}) => updateFn("osdisk", key)}
                   placeholder="Select OS Disk"
                   options={[
+                    { key: 'df', text: 'Use the default for the VM size', itemType: DropdownMenuItemType.Header },
+                    { key: 0, text: 'default' },
                     { key: 'pd', text: 'Premium SSD Managed Disks', itemType: DropdownMenuItemType.Header },
                     { key: 32, text: '32 GiB (120 IOPS)' },
                     { key: 64, text: '64 GiB (240 IOPS)' },
@@ -400,20 +408,20 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
       </Stack>
       <Checkbox  checked={vals.reboot} onChange={(ev,val) => updateFn("reboot",val)} label="Automatically reboot nodes after scheduled OS updates (kured)"  />
 
-      <Separator/>
+      <Separator className="notopmargin"/>
 
       <Stack.Item align="start">
         <Label required={true}>
         Cluster Monitoring requirements
         </Label>
         <ChoiceGroup
-          defaultSelectedKey={vals.mon}
+          defaultSelectedKey={vals.monitor}
           options={[
             { key: 'none', text: 'None, or I will deploy my own managed or oss solution' },
             { key: 'aci',text: 'Microsoft managed addon for for metrics and container logs (azure monitor)'}
             
           ]}
-          onChange={(ev, opt) => updateFn("mon", opt.key)}
+          onChange={(ev, opt) => updateFn("monitor", opt.key)}
         />
       </Stack.Item>
 
@@ -439,9 +447,9 @@ function AppScreen ({vals, updateFn, invalidFn}) {
       <Label>Select Default or Custom Networking Connectivity</Label>
       <div ref={_calloutTarget} style={{marginTop: 0, maxWidth: "220px"}}>
         <ChoiceGroup 
-          defaultSelectedKey={vals.appVnet}
+          defaultSelectedKey={vals.connectivity}
           onClick={() => setCallout(true)}
-          onChange={(ev, {key}) => updateFn("appVnet", key)}
+          onChange={(ev, {key}) => updateFn("connectivity", key)}
           options={[
             {
               key: false,
@@ -457,7 +465,7 @@ function AppScreen ({vals, updateFn, invalidFn}) {
         />
       </div>
     
-      { callout && !vals.appVnet && (
+      { callout && !vals.connectivity && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -483,7 +491,7 @@ function AppScreen ({vals, updateFn, invalidFn}) {
       )}
 
 
-      { callout && vals.appVnet && (
+      { callout && vals.connectivity && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -502,7 +510,7 @@ function AppScreen ({vals, updateFn, invalidFn}) {
           </Callout>
       )}
         
-      <Separator/>
+      <Separator className="notopmargin"/>
 
       <Stack.Item align="start">
         <Label required={true}>
@@ -521,7 +529,7 @@ function AppScreen ({vals, updateFn, invalidFn}) {
 
       <Stack.Item align="center" styles={{ root: {display: (vals.ingress === "none" ? "none" : "block")}}} >
         <Stack tokens={{ childrenGap: 15 }}>
-          <Checkbox  checked={vals.dns} onChange={(ev,v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires Azure DNS Zone <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t">instructions</Link>)</Text>} />
+          <Checkbox  checked={vals.dns} onChange={(ev,v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires <Text style={{fontWeight: "bold"}}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
           {((show) => {
             //  styles={{ root: {display: (vals.dns ? "block" :  "none" )}}}
            if (show) {
@@ -534,12 +542,13 @@ function AppScreen ({vals, updateFn, invalidFn}) {
             }
             invalidFn("certMan", invalid)
             return (
-              <TextField value={vals.dnsZone} onChange={(ev,v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label={<Text>Enter the ResourceId of your Azure DNS Zone <Link target="_t" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">here</Link></Text>} />
+              <TextField value={vals.dnsZone} onChange={(ev,v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} underlined required placeholder="Resource Id" label={<Text style={{fontWeight: 600}}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
             )
            } else {
             invalidFn("certMan", false)
            }
-          })(vals.dns)}
+          })(vals.dns && vals.ingress !== 'none')}
+          
           <Checkbox  checked={vals.certMan} onChange={(ev,v) =>  updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email"  />
           {((show) => {
             //  styles={{ root: {display: (vals.dns ? "block" :  "none" )}}}
@@ -558,29 +567,29 @@ function AppScreen ({vals, updateFn, invalidFn}) {
            } else {
             invalidFn("certEmail", false)
            }
-          })(vals.certMan)}
+          })(vals.certMan && vals.ingress !== 'none')}
           
          
         </Stack>
       </Stack.Item>
 
-      <Separator/>
+      <Separator className="notopmargin"/>
 
       <Stack.Item align="start">
         <Label required={true}>
         Do you require a secure private container registry to store my application images
         </Label>
         <ChoiceGroup
-          defaultSelectedKey={vals.reg}
+          defaultSelectedKey={vals.registry}
           options={[
             { key: 'none',text: 'No, my application images will be on dockerhub or another registry'},
             { key: 'acr', text: 'Yes, setup Azure Container Registry & secure access to the cluster ($)' }
           ]}
-          onChange={(ev, {k}) => updateFn("reg",k)}
+          onChange={(ev, {k}) => updateFn("registry",k)}
         />
       </Stack.Item>
 
-      <Separator/>
+      <Separator className="notopmargin"/>
 
       <Label required={true}>
       My Application will use the following features (TBC)
@@ -622,14 +631,15 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
                 text: 'None'
               },
               {
-                key: 'er',
+                key: 'onprem',
                 iconProps: { iconName: 'ChromeRestore' },
                 text: 'Dedicated (Gateway)'
               },
               {
-                key: 'hs',
+                key: 'peer',
                 iconProps: { iconName: 'SplitObject' },
                 text: 'HubSpoke (Peering)',
+                disabled: true
               }
             ]}
           />
@@ -654,7 +664,7 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
             </div>
           </Callout>
       )}
-      { callout && vals.topology === "er" && (
+      { callout && vals.topology === "onprem" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -674,7 +684,7 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
       )}
 
 
-      { callout && vals.topology === "hs" && (
+      { callout && vals.topology === "peer" && (
           <Callout
             className="ms-CalloutExample-callout"
             target={_calloutTarget}
@@ -693,7 +703,7 @@ function NetworkScreen ({vals, updateFn, invalidFn}) {
           </Callout>
       )}
         
-      <Separator/>
+      <Separator className="notopmargin"/>
     
       <Toggle
           label="Do you need to limit your non-routable IP usage on your network (use network calculator)"
