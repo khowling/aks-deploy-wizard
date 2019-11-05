@@ -17,7 +17,7 @@ export default function App() {
       <Text variant="xLarge" styles={boldStyle}>
         Welcome to AKS Deploy
       </Text>
-      <Text variant="large">Tell us the requirements of your AKS deployment, and we will generate the configuration to create your cluster, incorporating all Microsoft's best-practics guidence </Text>
+      <Text >Tell us the requirements of your AKS deployment, and we will generate the configuration to create your cluster, incorporating all Microsoft's best-practics guidence </Text>
       <PortalNav/>
     </Stack>
   )
