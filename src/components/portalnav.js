@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Pivot, PivotItem } from 'office-ui-fabric-react/lib/Pivot'
 import { DefaultButton } from 'office-ui-fabric-react/lib/Button';
 
-import { Link, Separator, DropdownMenuItemType, Dropdown, Slider, DirectionalHint, Callout, Stack, Text, Toggle, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from 'office-ui-fabric-react';
+import { Icon, Link, Separator, DropdownMenuItemType, Dropdown, Slider, DirectionalHint, Callout, Stack, Text, Toggle, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from 'office-ui-fabric-react';
 import { TextField, MaskedTextField } from 'office-ui-fabric-react/lib/TextField';
 
 import { mergeStyles } from 'office-ui-fabric-react/lib/Styling';
@@ -54,6 +54,12 @@ export default function PortalNav () {
       pod: "10.244.0.0/16",
       service:"10.0.0.0/16"
     })
+    const [deploy, setDeploy] = useState({
+      clusterName: "",
+      location: "WestEurope", 
+      demoapp: false,
+      disablePreviews: false
+    })
 
 
     function _handleLinkClick (item) {
@@ -79,6 +85,17 @@ export default function PortalNav () {
       }
     }
 
+    function _customRenderer(link, defaultRenderer) {
+      return (
+        <span>
+          { invalidArray.length>0 && 
+          <Icon iconName="Warning12" style={{ color: 'red' }} />
+          }
+          {defaultRenderer(link)}
+        </span>
+      );
+    }
+
     return (
       <div>
         <Pivot selectedKey={key} onLinkClick={_handleLinkClick}>
@@ -98,9 +115,9 @@ export default function PortalNav () {
             <NetworkScreen vals={net} app={app} cluster={cluster} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
             <Separator className="notopmargin"/>
           </PivotItem>
-          <PivotItem headerText="Deploy" itemKey="3">
+          <PivotItem headerText="Deploy" itemKey="3" onRenderItemLink={_customRenderer}>
             <Separator className="notopmargin"/>
-            <DeployScreen net={net} app={app} cluster={cluster} invalidArray={invalidArray}/>
+            <DeployScreen vals={deploy} net={net} app={app} cluster={cluster} updateFn={(key, val) => mergeState (setDeploy, deploy, key, val)} invalidArray={invalidArray}/>
             <Separator className="notopmargin"/>
           </PivotItem>
         </Pivot>
@@ -112,13 +129,7 @@ export default function PortalNav () {
     )
 }
 
-function DeployScreen({net,app,cluster, invalidArray}) {
-
-  const [name, setName] = useState("")
-  const [location,setLocation] = useState("WestEurope")
-  const [demoapp,setDemoapp] = useState(false)
-  const [disablePreviews,setDisablePreviews] = useState(false)
-
+function DeployScreen({vals, updateFn, net,app,cluster, invalidArray}) {
 
   let deploy_version = "v1.6"
   var queryString = window && window.location.search
@@ -130,24 +141,24 @@ function DeployScreen({net,app,cluster, invalidArray}) {
   }
 
   let aad_cmd = cluster.useAad ? "-t " +  (cluster.useAltAad ?  cluster.aadid : "current") : ""
-  let features = (app.podscale ? " -a podscale " : "") + (app.podid ? "-a podid " :"" ) +  (app.flexvol ? "-a flexvol " :"" ) + (app.ingress !== 'none' ? (` -a ${app.ingress} ` + (app.dns ? ` -a dns=${app.dnsZone.split("/")[4]+"/"+app.dnsZone.split("/")[8]}`: "") + (app.certMan ? ` -a cert=${app.certEmail}`: "")) : "") + (cluster.securityLevel === "high" ? ` -a calico -a afw=AzureCloud.${location} ` : "") + (cluster.connectivity ? " -a vnet " : "") + (net.topology !== 'none' ? net.topology : "") + (cluster.reboot ? " -a kured " : "") + (cluster.autoscale ? ` -a clustrautoscaler=${cluster.nodemax} ` : "") + (cluster.monitor !== 'none' ? " -a aci " : "") + (app.registry !== 'none' ? " -a acr " : "")
+  let features = (app.podscale ? " -a podscale " : "") + (app.podid ? "-a podid " :"" ) +  (app.flexvol ? "-a flexvol " :"" ) + (app.ingress !== 'none' ? (` -a ${app.ingress} ` + (app.dns && cluster.securityLevel === "normal" ? ` -a dns=${app.dnsZone.split("/")[4]+"/"+app.dnsZone.split("/")[8]}`: "") + (app.certMan && cluster.securityLevel === "normal" ? ` -a cert=${app.certEmail}`: "")) : "") + (cluster.securityLevel === "high" ? ` -a calico -a afw=AzureCloud.${vals.location} ` : "") + (cluster.connectivity ? " -a vnet " : "") + (net.topology !== 'none' ? net.topology : "") + (cluster.reboot ? " -a kured " : "") + (cluster.autoscale ? ` -a clustrautoscaler=${cluster.nodemax} ` : "") + (cluster.monitor !== 'none' ? " -a aci " : "") + (app.registry !== 'none' ? " -a acr " : "")
   let preview_features = (cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")  
 
 
   let deploy_str=`wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
     tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
-    ./deploy.sh -l ${location} ${net.kubenet ? " -n kubenet " : ""} -c ${cluster.nodeinit} ${cluster.vmsku !== 'default' ? "-v " + cluster.vmsku: ""} ${cluster.osdisk >0 ? "-o " + cluster.osdisk: ""} ${demoapp ? "-d" : ""} ${aad_cmd}  \\
-    ${features} ${disablePreviews ? "" : preview_features } \\
-    ${name} )`
+    ./deploy.sh -l ${vals.location} ${net.kubenet ? " -n kubenet " : ""} -c ${cluster.nodeinit} ${cluster.vmsku !== 'default' ? "-v " + cluster.vmsku: ""} ${cluster.osdisk >0 ? "-o " + cluster.osdisk: ""} ${vals.demoapp ? "-d" : ""} ${aad_cmd}  \\
+    ${features} ${vals.disablePreviews ? "" : preview_features } \\
+    ${vals.clusterName} )`
 
-  let invalidname = name.length <5
+  let invalidname = vals.clusterName.length <5
   return (
     <Stack  tokens={{ childrenGap: 15 }} styles={{ root: { width: 650 } }}>
-      <TextField  label="Cluster Name" onChange={(ev,val) => setName(val)} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={name}  />
+      <TextField  label="Cluster Name" onChange={(ev,val) => updateFn("clusterName", val)} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={vals.clusterName}  />
       <Dropdown
                   label="Location"
-                  selectedKey={location}
-                  onChange={(ev,{key}) => setLocation(key)}
+                  selectedKey={vals.location}
+                  onChange={(ev,{key}) => updateFn("location", key)}
                   options={[
                     { key: 'europe', text: 'Europe', itemType: DropdownMenuItemType.Header },
                     { key: "WestEurope", text: "West Europe" },
@@ -166,20 +177,21 @@ function DeployScreen({net,app,cluster, invalidArray}) {
                   styles={{ dropdown: { width: 300 } }}
                 />
 
+      { (app.ingress === 'none' || !app.dns || !app.certMan) && 
+        <MessageBar  messageBarType={MessageBarType.info}>To enable the option of deploying a <b>Demo Ecommerce App</b>, go to the <b>Application Requirements</b> tab, and select an ingress option (Application Gateway or Nginx), and complete the FQDN and Certificate options</MessageBar> 
+      }
       <Toggle
           disabled={ (app.ingress === 'none' || !app.dns || !app.certMan)}
-          label={<Text>Do you want to install the <Link target="_a" href="https://github.com/khowling/aks-ecomm-demo">Ecommerce demo app</Link> into your cluster with a HTTPS FQDN exposed through an Ingress controller</Text>}
-          checked={demoapp} onText="Yes" offText="No" onChange={(ev, checked) => setDemoapp(checked)} />            
+          label={<Text>Do you want to install the <Link target="_a" href="https://github.com/khowling/aks-ecomm-demo">Demo Ecommerce App</Link> into your cluster with a HTTPS FQDN exposed through an Ingress controller</Text>}
+          checked={vals.demoapp} onText="Yes" offText="No" onChange={(ev, checked) => updateFn("demoapp", checked)} />            
       
-      { (app.ingress === 'none' || !app.dns || !app.certMan) && 
-        <MessageBar  messageBarType={MessageBarType.warning}>To enable the option of deploying a <b>Demo Ecommerce App</b>, go tp the <b>Application Requirements</b> tab, and select an ingress option (Application Gateway or Nginx), and complete the FQDN and Certificate options</MessageBar> 
-      }
+
       <Separator >Deploy Cluster</Separator>
 
-      <Text variant="medium" >Open a Linux shell (requires 'az cli', 'kubectl' & 'helm' pre-installed), or, open the Azure Cloud Shell. <Text variant="medium" style={{fontWeight: "bold"}}>Paste the code below</Text> into the shell</Text>
+      <Text variant="medium" >Open a Linux shell (requires 'az cli', 'kubectl' & 'helm' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{fontWeight: "bold"}}>Paste the code below</Text> into the shell</Text>
       { cluster.securityLevel === "high" && 
       <MessageBar  messageBarType={MessageBarType.error}>Your deployment contains Preview features: <b>{ cluster.securityLevel === "high" ? "PodSecurityPolicy, AKSPrivateLinkPreview": ""}</b>, ensure you have registered for the preview before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features 
-      <Toggle label="Disable Preview Features" onText="Yes" offText="No" checked={disablePreviews} onChange={(ev,checked) => setDisablePreviews(checked)}/>
+      <Toggle label="Disable Preview Features" onText="Yes" offText="No" checked={vals.disablePreviews} onChange={(ev,checked) => updateFn("disablePreviews", checked)}/>
       </MessageBar>
       
       }
@@ -244,12 +256,12 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
                 This is the simplest AKS deployment to operate, while still providing the following security controls
               </Text>
               <ul>
-                <li>Dedicated agent nodes in private VNET</li>
+                <li>Dedicated agent nodes in private VNET with north-south security rules (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/security-overview">here</a></li>
                 <li>Disk encryption with Storage Service Encryption (SSE)</li>
-                <li>Public API Server endpoint with IP whitelist options (<a target="_wl" href="https://docs.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges">here</a>)</li>
+                <li>Protected public API Server endpoint with IP whitelist options (<a target="_wl" href="https://docs.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges">here</a>)</li>
                 <li>RBAC enabled cluster</li>
-                <li>Warning: no restictions on workloads accessing internet</li>
-                <li>Warning: no restictions on privileged workloads</li>
+                <li>Warning: no restrictions on workloads accessing internet</li>
+                <li>Warning: no restrictions on privileged workloads</li>
               </ul>
             </div>
           </Callout>
@@ -272,12 +284,12 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
                 WARNING: This is a highly secure AKS deployment, it is <Text  style={{fontWeight: "bold"}} >more complex</Text> to access & operate. It provides the following additional security controls:
               </Text>
               <ul>
-                <li>East-West intra-cluster networking policies (calico)</li>
+                <li>Cluster east-west networking rules (calico)</li>
                 <li>(Preview) Private API Server endpoint</li>
-                <li>Locked down workload internet access (azure firewall)</li>
-                <li>(Preview) Restricted privileged & runasroot workloads (pod-security-policy)</li>
-                <li>(Future) Enforcements on your clusters in a centralized manner (azure-policy)</li>
-                <li>(Future) Disk encryption (BYOK)</li>
+                <li>Restricted node internet access rules (azure firewall)</li>
+                <li>(Preview) Restrict privileged & RunAsRoot workloads (pod-security-policy)</li>
+                <li>(Future) Manage and report on the cluster & workload compliance (azure-policy)</li>
+                <li>(Future) BYOK Disk encryption</li>
               </ul>
             </div>
           </Callout>
@@ -563,17 +575,17 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
         />
       </Stack.Item>
 
-      { vals.ingress === "nginx" && cluster.securityLevel === "high" &&
+      { vals.ingress === "nginx" && cluster.securityLevel !== "normal" &&
         <MessageBar messageBarType={MessageBarType.warning}>You requested a high security cluster & nginx public ingress. Please ensure you follow this information after deployment <Link target="_ar1" href="https://docs.microsoft.com/en-us/azure/firewall/integrate-lb#public-load-balancer">Asymmetric routing</Link></MessageBar>
       }
-      { vals.ingress !== "none" && cluster.securityLevel === "high" &&
+      { vals.ingress !== "none" && cluster.securityLevel !== "normal" &&
         <MessageBar messageBarType={MessageBarType.warning}>You requested a high security cluster. The DNS and Certificate options are disabled as they require additional egress application firewall rules for image download and webhook requirements. You can apply these rules and install the helm chart after provisioning</MessageBar>
       }
 
       <Stack.Item align="center" styles={{ root: {display: (vals.ingress === "none" ? "none" : "block")}}} >
         <Stack tokens={{ childrenGap: 15 }}>
 
-          <Checkbox disabled={cluster.securityLevel === "high"}  checked={vals.dns} onChange={(ev,v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires <Text style={{fontWeight: "bold"}}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
+          <Checkbox disabled={cluster.securityLevel !== "normal"}  checked={vals.dns} onChange={(ev,v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires <Text style={{fontWeight: "bold"}}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
           {((show) => {
             //  styles={{ root: {display: (vals.dns ? "block" :  "none" )}}}
            if (show) {
@@ -591,7 +603,7 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
            } else {
             invalidFn("certMan", false)
            }
-          })(vals.dns && vals.ingress !== 'none')}
+          })(vals.dns && vals.ingress !== 'none' && cluster.securityLevel === "normal")}
           
           <Checkbox  disabled={cluster.securityLevel === "high"} checked={vals.certMan} onChange={(ev,v) =>  updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email"  />
           {((show) => {
@@ -611,7 +623,7 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
            } else {
             invalidFn("certEmail", false)
            }
-          })(vals.certMan && vals.ingress !== 'none')}
+          })(vals.certMan && vals.ingress !== 'none' && cluster.securityLevel === "normal")}
           
          
         </Stack>
