@@ -294,8 +294,6 @@ function ClusterScreen ({vals, updateFn, invalidFn}) {
             </div>
           </Callout>
       )}
-     
-      <Separator className="notopmargin"/>
 
       <Stack horizontal tokens={{ childrenGap: 142 }} style={ {marginTop: 0}}>
         <Stack.Item>
@@ -557,8 +555,6 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
             </div>
           </Callout>
       )}
-        
-      <Separator className="notopmargin"/>
 
       <Stack.Item align="start">
         <Label required={true}>
