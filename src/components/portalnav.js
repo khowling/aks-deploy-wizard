@@ -5,7 +5,7 @@ import { Pivot, PivotItem } from 'office-ui-fabric-react/lib/Pivot'
 import { DefaultButton } from 'office-ui-fabric-react/lib/Button';
 
 import { Icon, Link, Separator, DropdownMenuItemType, Dropdown, Slider, DirectionalHint, Callout, Stack, Text, Toggle, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from 'office-ui-fabric-react';
-import { TextField, MaskedTextField } from 'office-ui-fabric-react/lib/TextField';
+import { TextField } from 'office-ui-fabric-react/lib/TextField';
 
 import { mergeStyles } from 'office-ui-fabric-react/lib/Styling';
 
@@ -134,7 +134,7 @@ function DeployScreen({vals, updateFn, net,app,cluster, invalidArray}) {
   let deploy_version = "v1.6"
   var queryString = window && window.location.search
   if (queryString) {
-    var match = queryString.match('[?&]' + 'v' + '=([^&]+)')
+    var match = queryString.match('[?&]v=([^&]+)')
     if (match) {
       deploy_version = match[1]
     }
@@ -598,12 +598,12 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
             }
             invalidFn("certMan", invalid)
             return (
-              <TextField value={vals.dnsZone} onChange={(ev,v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} underlined required placeholder="Resource Id" label={<Text style={{fontWeight: 600}}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
+              <TextField disabled={cluster.securityLevel !== "normal"} value={vals.dnsZone} onChange={(ev,v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} underlined required placeholder="Resource Id" label={<Text style={{fontWeight: 600}}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
             )
            } else {
             invalidFn("certMan", false)
            }
-          })(vals.dns && vals.ingress !== 'none' && cluster.securityLevel === "normal")}
+          })(vals.dns && vals.ingress !== 'none')}
           
           <Checkbox  disabled={cluster.securityLevel === "high"} checked={vals.certMan} onChange={(ev,v) =>  updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email"  />
           {((show) => {
@@ -618,12 +618,12 @@ function AppScreen ({cluster, vals, updateFn, invalidFn}) {
               }
               invalidFn("certEmail", invalid)
              return (
-              <TextField value={vals.certEmail} onChange={(ev,v) => updateFn("certEmail", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label="Enter mail address for certificate notification:" underlined required placeholder="email@address.com" />
+              <TextField disabled={cluster.securityLevel !== "normal"} value={vals.certEmail} onChange={(ev,v) => updateFn("certEmail", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label="Enter mail address for certificate notification:" underlined required placeholder="email@address.com" />
              )
            } else {
             invalidFn("certEmail", false)
            }
-          })(vals.certMan && vals.ingress !== 'none' && cluster.securityLevel === "normal")}
+          })(vals.certMan && vals.ingress !== 'none')}
           
          
         </Stack>
