@@ -7,7 +7,17 @@ import * as serviceWorker from './serviceWorker';
 //import { loadTheme } from 'office-ui-fabric-react';
 import { mergeStyles } from 'office-ui-fabric-react';
 
+// Icons
 import { initializeIcons } from '@uifabric/icons';
+
+// Application Insights - https://github.com/microsoft/ApplicationInsights-JS/tree/master/extensions/applicationinsights-react-js
+import { ApplicationInsights } from '@microsoft/applicationinsights-web';
+
+export const appInsights = new ApplicationInsights({
+    config: { instrumentationKey: process.env.REACT_APP_APPINSIGHTS_KEY }
+});
+appInsights.loadAppInsights();
+
 initializeIcons();
 
 // Inject some global styles

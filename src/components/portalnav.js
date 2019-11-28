@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { Pivot, PivotItem } from 'office-ui-fabric-react/lib/Pivot'
 import { DefaultButton } from 'office-ui-fabric-react/lib/Button';
@@ -9,13 +9,35 @@ import { TextField } from 'office-ui-fabric-react/lib/TextField';
 
 import { mergeStyles } from 'office-ui-fabric-react/lib/Styling';
 
+import {appInsights} from '../index.js'
+
 const optionRootClass = mergeStyles({
   display: 'flex',
   alignItems: 'baseline'
 });
 
+
+function useAITracking(componentName, key) {
+
+  useEffect( () => {
+    const start= new Date(), pagename = `${componentName}.${key}`
+    appInsights.startTrackPage (pagename)
+    return () => {
+      console.log (`exit screen ${key} ${(new Date() - start)/1000}`)
+      appInsights.stopTrackPage(pagename, 
+        { 'Component Name': componentName, 'Navigation': key },
+        {mounttime: (new Date() - start)/1000})
+    };
+  }, [componentName, key])
+
+}
+
+
 export default function PortalNav () {
     const [key, setKey] = useState("0")
+    const navScreenHeader = ["Cluster Requirements", "Application Requirements", "Advanced Connectivity", "Deploy"]
+
+    useAITracking ("PortalNav", navScreenHeader[key])
     const [invalidArray, setInvalidArray] = useState([])
     const [cluster, setCluster] = useState({
         securityLevel: "normal",
@@ -100,22 +122,22 @@ export default function PortalNav () {
       <div>
         <Pivot selectedKey={key} onLinkClick={_handleLinkClick}>
           
-          <PivotItem headerText="Cluster Requirements" itemKey="0">
+          <PivotItem headerText={navScreenHeader[0]} itemKey="0">
             <Separator className="notopmargin"/>
             <ClusterScreen vals={cluster} updateFn={(key, val) => mergeState (setCluster, cluster, key, val)} invalidFn={(key, val) => invalidFn("cluster", key, val)} />
             <Separator className="notopmargin"/>
             </PivotItem>
-          <PivotItem headerText="Application Requirements" itemKey="1" >
+          <PivotItem headerText={navScreenHeader[1]} itemKey="1" >
             <Separator className="notopmargin"/>
             <AppScreen cluster={cluster} vals={app} updateFn={(key, val) => mergeState (setApp, app, key, val)} invalidFn={(key, val) => invalidFn("app", key, val)} />
             <Separator className="notopmargin"/>
           </PivotItem>
-          <PivotItem headerText="Advanced Connectivity" itemKey="2" headerButtonProps={{disabled: !app.connectivity}} itemIcon={!app.connectivity ? 'StatusCircleBlock' : 'PlugDisconnected'}>
+          <PivotItem headerText={navScreenHeader[2]} itemKey="2" headerButtonProps={{disabled: !app.connectivity}} itemIcon={!app.connectivity ? 'StatusCircleBlock' : 'PlugDisconnected'}>
             <Separator className="notopmargin"/>
             <NetworkScreen vals={net} app={app} cluster={cluster} updateFn={(key, val) => mergeState (setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
             <Separator className="notopmargin"/>
           </PivotItem>
-          <PivotItem headerText="Deploy" itemKey="3" onRenderItemLink={_customRenderer}>
+          <PivotItem headerText={navScreenHeader[3]} itemKey="3" onRenderItemLink={_customRenderer}>
             <Separator className="notopmargin"/>
             <DeployScreen vals={deploy} net={net} app={app} cluster={cluster} updateFn={(key, val) => mergeState (setDeploy, deploy, key, val)} invalidArray={invalidArray}/>
             <Separator className="notopmargin"/>
@@ -195,7 +217,7 @@ function DeployScreen({vals, updateFn, net,app,cluster, invalidArray}) {
       </MessageBar>
       
       }
-      <TextField label="Command" multiline rows={5} disabled value={deploy_str} errorMessage={invalidname || invalidArray.length>0 ? "Please fix errors before running script" : ""}/>
+      <TextField label="Command" multiline rows={5} readOnly value={deploy_str} errorMessage={invalidname || invalidArray.length>0 ? "Please fix errors before running script" : ""}/>
     
     </Stack>
   )
