@@ -47,15 +47,20 @@ export default function PortalNav() {
   const navScreenHeader = ["Cluster Details", "Addon Details", "Networking Details", "Deploy"]
 
   useAITracking("PortalNav", navScreenHeader[key])
-  const [invalidArray, setInvalidArray] = useState([])
+  const [invalidArray, setInvalidArray] = useState({
+    deploy: [],
+    net: [],
+    cluster: [],
+    addons: []
+  })
   const [cluster, setCluster] = useState({
     //securityLevel: "normal",
     apisecurity: 'none',
     networkPlugin: 'azure',
     policy: false,
     autoscale: false,
-    upgradeChannel:false,
-    count: 3,
+    upgradeChannel:'none',
+    count: 2,
     maxCount: 20,
     vmSize: "Standard_DS3_v2",
     osDiskSizeGB: 0,
@@ -82,7 +87,7 @@ export default function PortalNav() {
     afw: false,
     vnetserviceend: true,
     vnetprivateend: false,
-    createVNET: false,
+    custom_vnet: false,
     vnet: "10.0.0.0/8",
     akssub: "10.240.0.0/16",
     ilbsub: "10.241.0.0/24",
@@ -91,6 +96,12 @@ export default function PortalNav() {
     agsub: "10.241.0.0/24",
     podCidr: "10.244.0.0/16",
     service: "10.0.0.0/16"
+  })
+  const [deploy, setDeploy] = useState({
+    clusterName: "",
+    location: "WestEurope",
+    demoapp: false,
+    disablePreviews: true
   })
 
   useEffect(() => {
@@ -108,7 +119,7 @@ export default function PortalNav() {
   function setOperationsManaged()  {
     setDefaultCluster('managed')
     setCluster((prev) => {return {...cluster, autoscale: true, upgradeChannel:'stable'}})
-    setAddons((prev) => {return {...addons, registry: 'acr', ingress: 'agic', monitor: 'aci', reboot: true}})
+    setAddons((prev) => {return {...addons, registry: 'acr', ingress: 'appgw', monitor: 'aci', reboot: true}})
   }
   
   function _handleLinkClick(item) {
@@ -116,24 +127,24 @@ export default function PortalNav() {
   }
 
   function mergeState(fn, state, key, val) {
-    fn(Object.assign({}, state, { [key]: val }))
+    fn({...state, [key]: val })
   }
 
   
 
   function invalidFn(page, key, invalid) {
-    let akey = page + "-" + key
-    if (!invalid && invalidArray.includes(akey)) {
-      setInvalidArray(invalidArray.filter((v) => v !== akey))
-    } else if (invalid && !invalidArray.includes(akey)) {
-      setInvalidArray(invalidArray.concat(akey))
+    
+    if (!invalid && invalidArray[page].includes(key)) {
+      setInvalidArray({...invalidArray, [page]: invalidArray[page].filter((v) => v !== key)})
+    } else if (invalid && !invalidArray[page].includes(key)) {
+      setInvalidArray({...invalidArray, [page]: invalidArray[page].concat(key)})
     }
   }
 
-  function _customRenderer(link, defaultRenderer) {
+  function _customRenderer(page, link, defaultRenderer) {
     return (
       <span>
-        { invalidArray.length > 0 &&
+        { invalidArray[page].length > 0 &&
           <Icon iconName="Warning12" style={{ color: 'red' }} />
         }
         {defaultRenderer(link)}
@@ -285,8 +296,9 @@ export default function PortalNav() {
                 <li>Authorized IP address ranges (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges">docs</a>)</li>
                 <li>Restrict privileged workloads (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
                 <li>East-West traffic control (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/use-network-policies">docs</a>)</li>
-                <li>Service Endpoint dependencies (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview">docs</a>)</li>
-              </ul>
+              {/* <li>Service Endpoint dependencies (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview">docs</a>)</li>
+                */}
+                </ul>
               </div>
             </Card.Item>
           </Card>
@@ -325,17 +337,17 @@ export default function PortalNav() {
         <Separator styles={{root:{marginTop: "10px !important", marginBottom: "0px"}}}><b>Deploy</b> (optionally use detail tabs for low-level configuration)</Separator>
         
         <Pivot selectedKey={key} onLinkClick={_handleLinkClick}>
-          <PivotItem headerText={navScreenHeader[3]} itemKey="0" onRenderItemLink={_customRenderer}>
-          <DeployScreen net={net} addons={addons} cluster={cluster} updateFn={(key, val) => mergeState(setCluster, cluster, key, val)} invalidArray={invalidArray} />
+          <PivotItem headerText={navScreenHeader[3]} itemKey="0" onRenderItemLink={(a,b) => _customRenderer('deploy', a,b)}>
+          <DeployScreen net={net} addons={addons} cluster={cluster} deploy={deploy} updateFn={(key, val) => mergeState(setDeploy, deploy, key, val)} invalidFn={(key, val) => invalidFn("deploy", key, val)} invalidArray={invalidArray} />
 
           </PivotItem>
-          <PivotItem headerText={navScreenHeader[0]} itemKey="1">
+          <PivotItem headerText={navScreenHeader[0]} itemKey="1" onRenderItemLink={(a,b) => _customRenderer('cluster', a,b)} >
             <ClusterScreen cluster={cluster} updateFn={(key, val) => mergeState(setCluster, cluster, key, val)} invalidFn={(key, val) => invalidFn("cluster", key, val)} />
           </PivotItem>
-          <PivotItem headerText={navScreenHeader[1]} itemKey="2" >
+          <PivotItem headerText={navScreenHeader[1]} itemKey="2" onRenderItemLink={(a,b) => _customRenderer('addons', a,b)} >
             <AddonsScreen cluster={cluster} addons={addons} updateFn={(key, val) => mergeState(setAddons, addons, key, val)} invalidFn={(key, val) => invalidFn("addons", key, val)} />
           </PivotItem>
-          <PivotItem headerText={navScreenHeader[2]} itemKey="3" headerButtonProps={{ disabled: false }} itemIcon={'PlugDisconnected'}>
+          <PivotItem headerText={navScreenHeader[2]} itemKey="3"  onRenderItemLink={(a,b) => _customRenderer('net', a,b)}>
             <NetworkScreen net={net} addons={addons} cluster={cluster} updateFn={(key, val) => mergeState(setNet, net, key, val)} invalidFn={(key, val) => invalidFn("net", key, val)} />
           </PivotItem>
          
@@ -348,15 +360,9 @@ export default function PortalNav() {
   )
 }
 
-function DeployScreen({ updateFn, net, addons, cluster, invalidArray }) {
+function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, invalidArray }) {
 
-  
-  const [deploy, setDeploy] = useState({
-    clusterName: "",
-    location: "WestEurope",
-    demoapp: false,
-    disablePreviews: false
-  })
+  const [ip, setIp] = useState("")
 
   let deploy_version = "v1.6"
   var queryString = window && window.location.search
@@ -367,22 +373,35 @@ function DeployScreen({ updateFn, net, addons, cluster, invalidArray }) {
     }
   }
 
-  let aad_cmd = cluster.enable_aad ? "-t " + (cluster.useAltAad ? cluster.aad_tenant_id : "current") : ""
+  useEffect(() => {
+    
+    fetch('https://api.ipify.org?format=json').then(response => {
+      return response.json();
+    }).then((res) => {
+      setIp(res.ip)
+    }).catch((err) => console.error('Problem fetching my IP', err))
+  })
 
-  let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg; az deployment group create -g ${deploy.clusterName}-rg  --template-file ./azuredeploy.json --parameters ` +
+  //let aad_cmd = cluster.enable_aad ? "-t " + (cluster.useAltAad ? cluster.aad_tenant_id : "current") : ""
+  const template_uri = 'https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/main.json'
+
+  let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg; az deployment group create -g ${deploy.clusterName}-rg  --template-uri ${template_uri} --parameters ` +
     ` resourceName=${deploy.clusterName} ` +
     (cluster.vmSize !== 'default' ? ` agentVMSize=${cluster.vmSize} ` : '') +
     ` agentCount=${cluster.count} ` +
     (cluster.autoscale ? ` agentCountMax=${cluster.maxCount} ` : '') +
     (cluster.osDiskType === 'Managed' ? ` osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? ` osDiskSizeGB={$cluster.osDiskSizeGB} ` : '')}` : '') +
-    (net.createVNET ? ' createVNET=true ' : '') + 
+    (net.custom_vnet ? ' custom_vnet=true ' : '') + 
     (cluster.enable_aad ? ` enable_aad=true ${(cluster.aad_tenant_id  ? ` aad_tenant_id={$cluster.aad_tenant_id} ` : '')}  ` : '') +
-    (addons.ingress === 'appgw' ? ` applicationGateways_sku=WAF_v2 ` : '') +
     (addons.registry === 'acr' ? ` registries_sku=Basic ` : '') +
-    (net.afw ?  ` azureFirewalls=true  CloudServiceTag=AzureCloud.${deploy.location} `  : '') +
+    (net.afw ?  ` azureFirewalls=true `  : '') +
     (addons.monitor === 'aci' ? ` omsagent=true ` : "") + 
     (addons.networkPolicy !== 'none' ?  ` networkPolicy=${addons.networkPolicy} ` : '') + 
-    (cluster.networkPlugin !== 'azure' ? ` networkPlugin=${cluster.networkPlugin} ` : '')
+    (cluster.networkPlugin !== 'azure' ? ` networkPlugin=${cluster.networkPlugin} ` : '') + 
+    (cluster.apisecurity === 'whitelist' ? ` authorizedIPRanges=${ip} ` : '') +
+    (cluster.apisecurity === 'private' ? ` enablePrivateCluster=true ` : '')
+
+
 
   let features = 
     (addons.podscale ? " -a podscale " : "") + 
@@ -390,31 +409,35 @@ function DeployScreen({ updateFn, net, addons, cluster, invalidArray }) {
     (addons.keyvaultcsi ? "-a keyvaultcsi " : "") + 
     (addons.reboot ? " -a kured " : "") + 
     (cluster.autoscale ? ` -a clustrautoscaler=${cluster.maxCount} ` : "") + 
-    (cluster.apisecurity !== 'none' ? ` -a apisecurity=${cluster.apisecurity} ` : "") 
+    (cluster.apisecurity !== 'none' ? ` apisecurity=${cluster.apisecurity} ` : "") 
 
   let preview_features = 
-    (addons.ingress !== 'none' ? (` -a ${addons.ingress} ` + (addons.dns && cluster.securityLevel === "normal" ? ` -a dns=${addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8]}` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` -a cert=${addons.certEmail}` : "")) : "") + 
-    (cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")
+    (cluster.upgradeChannel !== 'none' ?  ` upgradeChannel=${cluster.upgradeChannel} ` : '') +
+    (addons.ingress === 'appgw' ? ` ingressApplicationGateway=true ` : '') 
+    //? 'az feature register --name AKS-IngressApplicationGatewayAddon --namespace Microsoft.ContainerService' : '') +
+    //(` -a ${addons.ingress} ` + (addons.dns && cluster.securityLevel === "normal" ? ` -a dns=${addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8]}` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` -a cert=${addons.certEmail}` : "")) : "") + 
+    //(cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")
 
 
-  let deploy_str = `wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
-    tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
-    ./deploy.sh -l ${deploy.location} ${cluster.networkPlugin ? " -n networkPlugin " : ""} -c ${cluster.count} ${cluster.vmSize !== 'default' ? "-v " + cluster.vmSize : ""} ${cluster.osDiskSizeGB > 0 ? "-o " + cluster.osDiskSizeGB : ""} ${deploy.demoapp ? "-d" : ""} ${aad_cmd}  \\
-    ${features} ${deploy.disablePreviews ? "" : preview_features} \\
-    ${deploy.clusterName} )`
+  //let deploy_str = `wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
+  //  tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
+  //  ./deploy.sh -l ${deploy.location} ${cluster.networkPlugin ? " -n networkPlugin " : ""} -c ${cluster.count} ${cluster.vmSize !== 'default' ? "-v " + cluster.vmSize : ""} ${cluster.osDiskSizeGB > 0 ? "-o " + cluster.osDiskSizeGB : ""} ${deploy.demoapp ? "-d" : ""} ${aad_cmd}  \\
+  //  ${features} ${deploy.disablePreviews ? "" : preview_features} \\
+  //  ${deploy.clusterName} )`
 
   let invalidname = deploy.clusterName.length < 5
+  invalidFn('clusterName', invalidname)
   return (
     
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
       <Stack horizontal horizontalAlign="space-between" styles={{root: {width: "100%"}}}>
         <Stack styles={{root: {width: "300px"}}}>
           <Label style={{ marginBottom: "10px" }}>Cluster Name & Location</Label>
-          <TextField label="Cluster Name" onChange={(ev, val) => setDeploy({...deploy, clusterName: val})} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={deploy.clusterName} />
+          <TextField label="Cluster Name" onChange={(ev, val) => updateFn('clusterName', val)} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={deploy.clusterName} />
           <Dropdown
             label="Location"
             selectedKey={deploy.location}
-            onChange={(ev, { key }) =>setDeploy({...deploy, location: key})}
+            onChange={(ev, { key }) =>updateFn('location', key)}
             options={[
               { key: 'europe', text: 'Europe', itemType: DropdownMenuItemType.Header },
               { key: "WestEurope", text: "West Europe" },
@@ -450,23 +473,46 @@ function DeployScreen({ updateFn, net, addons, cluster, invalidArray }) {
 
       <Separator ><b>Deploy Cluster</b></Separator>
 
-      <Text variant="medium" >Open a Linux shell (requires 'az cli', 'kubectl' & 'helm' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the code below</Text> into the shell</Text>
-      { cluster.upgradeChannel  &&
-        <MessageBar messageBarType={MessageBarType.error}>Your deployment contains Preview features: <b>{cluster.upgradeChannel ? "Cluster auto-upgrade" : ""}</b>, ensure you have registered for the preview before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features
-      <Toggle label="Disable Preview Features" onText="Yes" offText="No" checked={deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", checked)} />
+      <Text variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the code below</Text> into the shell</Text>
+      { preview_features.length >0  &&
+        <MessageBar messageBarType={MessageBarType.warning}>
+          <Text >Your deployment contains Preview features: <b>{preview_features}</b>, Ensure you have registered for the preview before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
+        <Toggle styles={{root: {marginTop: "10px"}}} onText='preview disabled' offText="preview enabled" checked={deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", checked)} />
         </MessageBar>
 
       }
-      <TextField label="Command" multiline rows={5} readOnly value={armcmd} errorMessage={invalidname || invalidArray.length > 0 ? "Please fix errors before running script" : ""} />
+      { (addons.monitor === 'oss' || addons.ingress === 'nginx')  &&
+        <MessageBar messageBarType={MessageBarType.warning}>
+          <Text >Your deployment contains Opensource community solutions, these solutions are not managed by Microsoft, you will be responsible for managing the lifecycle of these solutions</Text>
+        </MessageBar>
+
+      }
+      <TextField label="Command" multiline rows={5} readOnly value={`${armcmd} ${deploy.disablePreviews ? '' : preview_features}`} errorMessage={invalidname || invalidArray.length > 0 ? "Please fix errors before running script" : ""} />
 
 
     </Stack>
   )
 }
 
+const VMs = [
+    { key: 'gp', text: 'General purpose V2', itemType: DropdownMenuItemType.Header },
+    { key: 'default',          text: '(Standard_DS2_v2) 2 vCPU,  7 GiB RAM, 14GiB SSD,  86 GiB cache (8000 IOPS)', eph: false },
+    { key: 'Standard_DS3_v2',  text: '(Standard_DS3_v2) 4 vCPU, 14 GiB RAM, 28GiB SSD, 172 GiB cache (16000 IOPS)', eph: true  },
+    { key: 'gp', text: 'General purpose V4', itemType: DropdownMenuItemType.Header },
+    { key: 'Standard_D2ds_v4', text: '2 vCPU,  8 GiB RAM, 75GiB  SSD (19000 IOPS)', eph: false },
+    { key: 'Standard_D4ds_v4', text: '4 vCPU, 16 GiB RAM, 150GiB SSD, 100 GiB cache  (38500 IOPS)', eph: false },
+    {key: 'Standard_D8ds_v4',  text: '8 vCPU, 32 GiB RAM, 300GiB SSD (77000 IOPS)', eph: true },
+    { key: 'comp', text: 'Compute optimized', itemType: DropdownMenuItemType.Header },
+    { key: 'Standard_F2s_v2', text: '2 vCPU, 4 GiB RAM, 16 GiB SSD (3200 IOPS)', eph: false }
+]
+
 function ClusterScreen({ cluster, updateFn, invalidFn }) {
 
   const [useAltAad, setUseAltAad] = useState(false)
+
+
+  const valid_osDiskType = cluster.osDiskType === 'Ephemperal' && !VMs.find(i => i.key === cluster.vmSize).eph
+  invalidFn('osDiskType', valid_osDiskType)
 
   return (
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
@@ -531,27 +577,18 @@ function ClusterScreen({ cluster, updateFn, invalidFn }) {
 
           <Stack.Item>
             <Label >Node Size</Label>
-            <Stack tokens={{ childrenGap: 0 }} styles={{ root: { width: 450 } }}>
+            <Stack tokens={{ childrenGap: 10 }} styles={{ root: { width: 450 } }}>
               <Dropdown
 
                 selectedKey={cluster.vmSize}
                 onChange={(ev, { key }) => updateFn("vmSize", key)}
                 placeholder="Select VM Size"
-                options={[
-                  { key: 'gp', text: 'General purpose V2', itemType: DropdownMenuItemType.Header },
-                  { key: 'default',          text: '(Standard_DS2_v2) 2 vCPU,  7 GiB RAM, 14GiB SSD,  86 GiB cache (8000 IOPS)' },
-                  { key: 'Standard_DS3_v2',  text: '(Standard_DS3_v2) 4 vCPU, 14 GiB RAM, 28GiB SSD, 172 GiB cache (16000 IOPS)' },
-                  { key: 'gp', text: 'General purpose V4', itemType: DropdownMenuItemType.Header },
-                  { key: 'Standard_D2ds_v4', text: '2 vCPU,  8 GiB RAM, 75GiB  SSD (19000 IOPS)'},
-                  { key: 'Standard_D4ds_v4', text: '4 vCPU, 16 GiB RAM, 150GiB SSD, 100 GiB cache  (38500 IOPS)'},
-                  {key: 'Standard_D8ds_v4',  text: '8 vCPU, 32 GiB RAM, 300GiB SSD (77000 IOPS)'},
-                  { key: 'comp', text: 'Compute optimized', itemType: DropdownMenuItemType.Header },
-                  { key: 'Standard_F2s_v2', text: '2 vCPU, 4 GiB RAM, 16 GiB SSD (3200 IOPS)' }
-                ]}
+                options={VMs}
                 styles={{ dropdown: { width: "100%" } }}
               />
 
-              <ChoiceGroup
+                { valid_osDiskType && <MessageBar messageBarType={MessageBarType.error}>Youre selected VM cache is not large enough to support Ephemeral. Select 'Managed' or a VM with a larger cache</MessageBar>}
+                <ChoiceGroup
                 onChange={(ev, { key }) => updateFn("osDiskType", key)}
                 selectedKey={cluster.osDiskType}
                 options={[
@@ -761,7 +798,7 @@ function AddonsScreen({ cluster, addons, updateFn, invalidFn }) {
           options={[
             { key: 'none', text: 'No, applications will not be exposed, or, I will configure my own solution' },
             { key: 'nginx', text: 'Yes, deploy nginx in the cluster to expose my apps to the internet (nginx ingress controller)' },
-            { key: 'appgw', text: 'Yes, deply an Azure Managed Gateway with WAF protection (Application Gateway) ($)' }
+            { key: 'appgw', text: 'Yes, deply an Azure Managed Gateway with WAF protection (Application Gateway)' }
           ]}
           onChange={(ev, opt) => updateFn("ingress", opt.key)}
         />
@@ -869,9 +906,9 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
       <Label>Select Default or Custom Networking Connectivity</Label>
       <div ref={_calloutTarget1} style={{ marginTop: 0, maxWidth: "220px" }}>
         <ChoiceGroup
-          selectedKey={net.createVNET}
+          selectedKey={net.custom_vnet}
           onClick={() => setCallout1(true)}
-          onChange={(ev, { key }) => updateFn("createVNET", key)}
+          onChange={(ev, { key }) => updateFn("custom_vnet", key)}
           options={[
             {
               key: false,
@@ -887,7 +924,7 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
         />
       </div>
 
-      { callout1 && !net.createVNET && (
+      { callout1 && !net.custom_vnet && (
         <Callout
           className="ms-CalloutExample-callout"
           target={_calloutTarget1}
@@ -913,7 +950,7 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
       )}
 
 
-      { callout1 && net.createVNET && (
+      { callout1 && net.custom_vnet && (
         <Callout
           className="ms-CalloutExample-callout"
           target={_calloutTarget1}
@@ -935,7 +972,7 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
       <Checkbox disabled={false} checked={net.afw} onChange={(ev, v) => updateFn("afw", v)} label="Implement Azure Firewall & UDR nexthop" />
 
 
-      { net.createVNET &&
+      { net.custom_vnet &&
       
       <Stack styles={adv_stackstyle}>
       <Label>Custom Network configration</Label>
@@ -943,32 +980,30 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
         <Stack {...columnProps}>
           <Label>AKS Virtual Network & Subnet CIDRs</Label>
           <Stack.Item align="start">
-            <TextField prefix="Vnet" onChange={(ev, val) => updateFn("vnet", val)} value={net.vnet} />
+            <TextField prefix="Cidr" onChange={(ev, val) => updateFn("vnet", val)} value={net.vnet} />
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" label="AKS Nodes" onChange={(ev, val) => updateFn("akssub", val)} value={net.akssub} />
+            <TextField prefix="Cidr" label="AKS Nodes" onChange={(ev, val) => updateFn("akssub", val)} value={net.akssub} />
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" label="LoadBalancer Services" onChange={(ev, val) => updateFn("ilbsub", val)} value={net.ilbsub} />
+            <TextField prefix="Cidr" label="LoadBalancer Services" onChange={(ev, val) => updateFn("ilbsub", val)} value={net.ilbsub} />
           </Stack.Item>
           <Stack.Item align="center">
-            <TextField prefix="Subnet" disabled={cluster.securityLevel === 'normal'} label="Azure Firewall" onChange={(ev, val) => updateFn("afwsub", val)} value={cluster.securityLevel !== 'normal' ? net.afwsub : "N/A"} />
+            <TextField prefix="Cidr" disabled={!net.afw} label="Azure Firewall" onChange={(ev, val) => updateFn("afwsub", val)} value={cluster.securityLevel !== 'normal' ? net.afwsub : "N/A"} />
           </Stack.Item>
+
           <Stack.Item align="center">
-            <TextField prefix="Subnet" disabled={net.topology !== 'onprem'} label="On-Premises Gateway" onChange={(ev, val) => updateFn("ersub", val)} value={net.topology === 'onprem' ? net.ersub : "N/A"} />
-          </Stack.Item>
-          <Stack.Item align="center">
-            <TextField prefix="Subnet" disabled={addons.ingress !== 'appgw'} label="Application Gateway" onChange={(ev, val) => updateFn("agsub", val)} value={addons.ingress === 'appgw' ? net.agsub : "N/A"} />
+            <TextField prefix="Cidr" disabled={addons.ingress !== 'appgw'} label="Application Gateway" onChange={(ev, val) => updateFn("agsub", val)} value={addons.ingress === 'appgw' ? net.agsub : "N/A"} />
           </Stack.Item>
         </Stack>
 
         <Stack {...columnProps}>
           <Label>Kubernetes Networking CIDRs</Label>
           <Stack.Item align="start">
-            <TextField label="POD Network" disabled={!cluster.networkPlugin} onChange={(ev, val) => updateFn("podCidr", val)} value={cluster.networkPlugin ? net.podCidr : "N/A"} />
+            <TextField prefix="Cidr" label="POD Network" disabled={cluster.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={cluster.networkPlugin ? net.podCidr : "N/A"} />
           </Stack.Item>
           <Stack.Item align="start">
-            <TextField label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
+            <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
           </Stack.Item>
 
         </Stack>
