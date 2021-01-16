@@ -14,7 +14,7 @@ import { initializeIcons } from '@uifabric/icons';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 export const appInsights = new ApplicationInsights({
-    config: { instrumentationKey: process.env.REACT_APP_APPINSIGHTS_KEY }
+  config: { instrumentationKey: process.env.REACT_APP_APPINSIGHTS_KEY }
 });
 appInsights.loadAppInsights();
 

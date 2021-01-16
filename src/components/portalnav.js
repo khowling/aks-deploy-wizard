@@ -56,7 +56,7 @@ export default function PortalNav() {
   const [cluster, setCluster] = useState({
     //securityLevel: "normal",
     apisecurity: 'none',
-    networkPlugin: 'azure',
+    apiips: '',
     policy: false,
     autoscale: false,
     upgradeChannel:'none',
@@ -67,6 +67,7 @@ export default function PortalNav() {
     osDiskType: "Ephemperal",
     enable_aad: true,
     aad_tenant_id: "",
+    enableAzureRBAC: true,
     aadgroupids: ""
   })
   const [addons, setAddons] = useState({
@@ -81,9 +82,11 @@ export default function PortalNav() {
     podid: false,
     podscale: false,
     reboot: false,
-    monitor: "none"
+    monitor: "none",
+    retentionInDays: 30
   })
   const [net, setNet] = useState({
+    networkPlugin: 'azure',
     afw: false,
     vnetserviceend: true,
     vnetprivateend: false,
@@ -108,6 +111,15 @@ export default function PortalNav() {
     console.log ('effect')
     setOperationsManaged()
     setSecurityNormal()
+
+  
+    fetch('https://api.ipify.org?format=json').then(response => {
+      return response.json();
+    }).then((res) => {
+      setCluster((prev) => {return {...prev, apiips: res.ip}})
+    }).catch((err) => console.error('Problem fetching my IP', err))
+ 
+
   },[])
   
   function setSecurityNormal()  { 
@@ -163,9 +175,9 @@ export default function PortalNav() {
         </Stack>
       </Stack>
 
-      <Stack verticalFill styles={{ root: { width: '960px', margin: '0 auto' } }}>
+      <Stack verticalFill styles={{ root: { width: '960px', margin: '0 auto', color: 'grey' } }}>
 
-        <Separator styles={{root:{margin: "10px 0"}}}><b>Operations Principles</b></Separator>
+        <Separator styles={{root:{margin: "15px 0"}}}><b>Operations Principles</b></Separator>
 
         <Stack horizontal tokens={{ childrenGap: 30 }}>
 
@@ -178,15 +190,17 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup  selectedKey={defaultCluster}  options={[{ key: 'none', text: 'Simplest bare-bones cluster'}]} />
+              <ChoiceGroup  selectedKey={defaultCluster}  options={[{ key: 'none', text: 'Simplest bare-bones cluster', styles: { root: {fontWeight: defaultCluster === 'none' ? '500' : 'normal'}}}]} />
             </Card.Item>
+
             <Card.Item>
               <FontIcon iconName="Manufacturing" className={iconClass} />
             </Card.Item>
-            <Card.Section>
+
+            <Card.Item styles={{root: { marginTop: '0px !important'}}}>
             <div style={{fontSize: "12px"}} >Just kubernetes please, I will make desisions later
               </div>
-            </Card.Section>
+            </Card.Item>
           </Card>
 
           <Card
@@ -198,12 +212,14 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup  selectedKey={defaultCluster} options={[{ key: 'oss', text: 'I prefer control & commuity opensource soltuions', styles: {fontWeight: "bold"} }]} />
+              <ChoiceGroup  selectedKey={defaultCluster} options={[{ key: 'oss', text: 'I prefer control & commuity opensource soltuions', styles: { root: {fontWeight: defaultCluster === 'oss' ? '500' : 'normal'}} }]} />
             </Card.Item>
+
             <Card.Item>
               <FontIcon iconName="DeveloperTools" className={iconClass} />
             </Card.Item>
-            <Card.Item>
+
+            <Card.Item styles={{root: { marginTop: '0px !important'}}}>
               <div style={{fontSize: "12px"}} >Use proven, opensource projects for my Kubernetes operational environment, and self-manage my clusters upgrades and scalling
               <ul>
                 <li>Manual Upgrades</li>
@@ -214,11 +230,6 @@ export default function PortalNav() {
               </ul>
               </div>
             </Card.Item>
-
-            <Card.Section>
-
-            </Card.Section>
-
           </Card>
 
           <Card
@@ -226,13 +237,14 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup selectedKey={defaultCluster} options={[{ key: 'managed', text: 'I want a managed environment (Recommended for most)' }]} />
+              <ChoiceGroup selectedKey={defaultCluster} options={[{ key: 'managed', text: 'I want a managed environment (Recommended for most)', styles: { root: {fontWeight: defaultCluster === 'managed' ? '500' : 'normal'}} }]} />
             </Card.Item>
 
             <Card.Item>
               <FontIcon iconName="Touch" className={iconClass} />
             </Card.Item>
-            <Card.Item>
+
+            <Card.Item styles={{root: { marginTop: '0px !important'}}}>
               <div style={{fontSize: "12px"}} >
                 I'd like my cluster to be auto-managed by Azure for upgrades and scalling, and use Azure provided managed addons to create an full environment with the minimum of operational requirements
               <ul>
@@ -245,16 +257,11 @@ export default function PortalNav() {
               </ul>
               </div>
             </Card.Item>
-
-            <Card.Section>
-              
-            </Card.Section>
-
           </Card>
         </Stack>
 
 
-        <Separator styles={{root:{marginTop: "10px !important", marginBottom: "10px"}}}><b>Security Principles</b></Separator>
+        <Separator styles={{root:{marginTop: "15px !important", marginBottom: "15px"}}}><b>Security Principles</b></Separator>
 
         <Stack horizontal tokens={{ childrenGap: 30 }}>
 
@@ -268,7 +275,7 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup  selectedKey={defaultSecurity} options={[{ key: 'low', text: 'Simple cluster with no additional access limitations', styles: {fontWeight: "bold"} }]} />
+              <ChoiceGroup  selectedKey={defaultSecurity} options={[{ key: 'low', text: 'Simple cluster with no additional access limitations', styles: { root: {fontWeight: defaultSecurity === 'low' ? '500' : 'normal'}}}]} />
             </Card.Item>
             <Card.Item>
               <FontIcon iconName="Unlock" className={iconClass} />
@@ -284,7 +291,7 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup  selectedKey={defaultSecurity} options={[{ key: 'normal', text: 'Custer with additional security controls (Recommended for most)', styles: {fontWeight: "bold"} }]} />
+              <ChoiceGroup  selectedKey={defaultSecurity} options={[{ key: 'normal', text: 'Custer with additional security controls (Recommended for most)', styles: { root: {fontWeight: defaultSecurity === 'normal' ? '500' : 'normal'}} }]} />
             </Card.Item>
             <Card.Item>
               <FontIcon iconName="Lock12" className={iconClass} />
@@ -313,7 +320,7 @@ export default function PortalNav() {
             tokens={{ childrenMargin: 12}}
           >
             <Card.Item>
-              <ChoiceGroup selectedKey={defaultSecurity} options={[{ key: 'high', text: 'Cluster with isolating networking controls' }]} />
+              <ChoiceGroup selectedKey={defaultSecurity} options={[{ key: 'high', text: 'Cluster with isolating networking controls', styles: { root: {fontWeight: defaultSecurity === 'high' ? '500' : 'normal'}} }]} />
             </Card.Item>
 
             <Card.Item>
@@ -334,7 +341,7 @@ export default function PortalNav() {
           </Card>
         </Stack>
         
-        <Separator styles={{root:{marginTop: "10px !important", marginBottom: "0px"}}}><b>Deploy</b> (optionally use detail tabs for low-level configuration)</Separator>
+        <Separator styles={{root:{marginTop: "15px !important", marginBottom: "5px"}}}><b>Deploy</b> (optionally use 'Details' tabs for additional configuration)</Separator>
         
         <Pivot selectedKey={key} onLinkClick={_handleLinkClick}>
           <PivotItem headerText={navScreenHeader[3]} itemKey="0" onRenderItemLink={(a,b) => _customRenderer('deploy', a,b)}>
@@ -362,7 +369,6 @@ export default function PortalNav() {
 
 function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, invalidArray }) {
 
-  const [ip, setIp] = useState("")
 
   let deploy_version = "v1.6"
   var queryString = window && window.location.search
@@ -373,33 +379,25 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
     }
   }
 
-  useEffect(() => {
-    
-    fetch('https://api.ipify.org?format=json').then(response => {
-      return response.json();
-    }).then((res) => {
-      setIp(res.ip)
-    }).catch((err) => console.error('Problem fetching my IP', err))
-  })
 
-  //let aad_cmd = cluster.enable_aad ? "-t " + (cluster.useAltAad ? cluster.aad_tenant_id : "current") : ""
-  const template_uri = 'https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/main.json'
 
-  let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg; az deployment group create -g ${deploy.clusterName}-rg  --template-uri ${template_uri} --parameters ` +
-    ` resourceName=${deploy.clusterName} ` +
-    (cluster.vmSize !== 'default' ? ` agentVMSize=${cluster.vmSize} ` : '') +
-    ` agentCount=${cluster.count} ` +
-    (cluster.autoscale ? ` agentCountMax=${cluster.maxCount} ` : '') +
-    (cluster.osDiskType === 'Managed' ? ` osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? ` osDiskSizeGB={$cluster.osDiskSizeGB} ` : '')}` : '') +
-    (net.custom_vnet ? ' custom_vnet=true ' : '') + 
-    (cluster.enable_aad ? ` enable_aad=true ${(cluster.aad_tenant_id  ? ` aad_tenant_id={$cluster.aad_tenant_id} ` : '')}  ` : '') +
-    (addons.registry === 'acr' ? ` registries_sku=Basic ` : '') +
-    (net.afw ?  ` azureFirewalls=true `  : '') +
-    (addons.monitor === 'aci' ? ` omsagent=true ` : "") + 
-    (addons.networkPolicy !== 'none' ?  ` networkPolicy=${addons.networkPolicy} ` : '') + 
-    (cluster.networkPlugin !== 'azure' ? ` networkPlugin=${cluster.networkPlugin} ` : '') + 
-    (cluster.apisecurity === 'whitelist' ? ` authorizedIPRanges=${ip} ` : '') +
-    (cluster.apisecurity === 'private' ? ` enablePrivateCluster=true ` : '')
+  let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg
+az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` +
+    ` kubernetesVersion=${process.env.REACT_APP_K8S_VERSION}` +
+    ` resourceName=${deploy.clusterName}` +
+    (cluster.vmSize !== 'default' ? ` agentVMSize=${cluster.vmSize}` : '') +
+    ` agentCount=${cluster.count}` +
+    (cluster.autoscale ? ` agentCountMax=${cluster.maxCount}` : '') +
+    (cluster.osDiskType === 'Managed' ? ` osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? ` osDiskSizeGB={$cluster.osDiskSizeGB}` : '')}` : '') +
+    (net.custom_vnet ? ' custom_vnet=true' : '') + 
+    (cluster.enable_aad ? ` enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id  ? `aad_tenant_id={$cluster.aad_tenant_id} ` : '')}` : '') +
+    (addons.registry === 'acr' ? `registries_sku=Basic` : '') +
+    (net.afw ?  ` azureFirewalls=true`  : '') +
+    (addons.monitor === 'aci' ? ` omsagent=true retentionInDays=${addons.retentionInDays}` : "") + 
+    (addons.networkPolicy !== 'none' ?  ` networkPolicy=${addons.networkPolicy}` : '') + 
+    (net.networkPlugin !== 'azure' ? ` networkPlugin=${net.networkPlugin}` : '') + 
+    (cluster.apisecurity === 'whitelist' ? ` authorizedIPRanges=${cluster.apiips}` : '') +
+    (cluster.apisecurity === 'private' ? ` enablePrivateCluster=true` : '')
 
 
 
@@ -407,13 +405,15 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
     (addons.podscale ? " -a podscale " : "") + 
     (addons.podid ? "-a podid " : "") + 
     (addons.keyvaultcsi ? "-a keyvaultcsi " : "") + 
-    (addons.reboot ? " -a kured " : "") + 
-    (cluster.autoscale ? ` -a clustrautoscaler=${cluster.maxCount} ` : "") + 
-    (cluster.apisecurity !== 'none' ? ` apisecurity=${cluster.apisecurity} ` : "") 
+    (addons.reboot ? ' -a kured ':'') + 
+    (cluster.autoscale ? ` -a clustrautoscaler=${cluster.maxCount} `:'') + 
+    (cluster.apisecurity !== 'none' ? ` apisecurity=${cluster.apisecurity} `:'') 
 
   let preview_features = 
-    (cluster.upgradeChannel !== 'none' ?  ` upgradeChannel=${cluster.upgradeChannel} ` : '') +
-    (addons.ingress === 'appgw' ? ` ingressApplicationGateway=true ` : '') 
+    (cluster.enable_aad && cluster.enableAzureRBAC ? ' enableAzureRBAC=true':'') +
+    (cluster.upgradeChannel !== 'none' ?  ` upgradeChannel=${cluster.upgradeChannel}` : '') +
+    (addons.ingress === 'appgw' ? ` ingressApplicationGateway=true` : '') 
+    
     //? 'az feature register --name AKS-IngressApplicationGatewayAddon --namespace Microsoft.ContainerService' : '') +
     //(` -a ${addons.ingress} ` + (addons.dns && cluster.securityLevel === "normal" ? ` -a dns=${addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8]}` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` -a cert=${addons.certEmail}` : "")) : "") + 
     //(cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")
@@ -430,9 +430,9 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
   return (
     
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
-      <Stack horizontal horizontalAlign="space-between" styles={{root: {width: "100%"}}}>
+      <Stack horizontal  styles={{root: {width: "100%"}}} tokens={{ childrenGap: 150 }}>
         <Stack styles={{root: {width: "300px"}}}>
-          <Label style={{ marginBottom: "10px" }}>Cluster Name & Location</Label>
+          
           <TextField label="Cluster Name" onChange={(ev, val) => updateFn('clusterName', val)} required errorMessage={invalidname ? "Enter valid cluster name" : ""} value={deploy.clusterName} />
           <Dropdown
             label="Location"
@@ -456,7 +456,9 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
             styles={{ dropdown: { width: 300 } }}
           />
         </Stack>
-
+        <Stack styles={{root: {width: "300px"}}}>
+        <TextField label="Kubernetes version" disabled={true} value={process.env.REACT_APP_K8S_VERSION}/>
+        </Stack>
         
 
          
@@ -473,10 +475,9 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
 
       <Separator ><b>Deploy Cluster</b></Separator>
 
-      <Text variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the code below</Text> into the shell</Text>
       { preview_features.length >0  &&
         <MessageBar messageBarType={MessageBarType.warning}>
-          <Text >Your deployment contains Preview features: <b>{preview_features}</b>, Ensure you have registered for the preview before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
+          <Text >Your deployment contains Preview features: <b>{preview_features}</b>, Ensure you have registered for ALL these previews before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
         <Toggle styles={{root: {marginTop: "10px"}}} onText='preview disabled' offText="preview enabled" checked={deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", checked)} />
         </MessageBar>
 
@@ -487,7 +488,8 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidFn, inval
         </MessageBar>
 
       }
-      <TextField label="Command" multiline rows={5} readOnly value={`${armcmd} ${deploy.disablePreviews ? '' : preview_features}`} errorMessage={invalidname || invalidArray.length > 0 ? "Please fix errors before running script" : ""} />
+      <TextField label="Command" styles={{root: {fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important', lineHeight: '19px'}}} multiline rows={5} readOnly value={`${armcmd}${deploy.disablePreviews ? '' : preview_features}`} errorMessage={invalidname || invalidArray.length > 0 ? "Please fix errors before running script" : ""} />
+      <Text styles={{root: {marginTop: "2px !important"}}} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
 
 
     </Stack>
@@ -664,7 +666,7 @@ function ClusterScreen({ cluster, updateFn, invalidFn }) {
         <Stack.Item>
           {cluster.enable_aad ? (
 
-            <Stack tokens={{ childrenGap: 0 }} styles={{ root: { width: 450, marginTop: "30px" } }}>
+            <Stack tokens={{ childrenGap: 10 }} styles={{ root: { width: 450, marginTop: "30px" } }}>
 
               <ChoiceGroup
                 styles={{ root: { width: 300 } }}
@@ -701,9 +703,17 @@ function ClusterScreen({ cluster, updateFn, invalidFn }) {
                 onChange={(ev, val) => setUseAltAad(val.key)}
                 
               />
+          
+          <Checkbox checked={cluster.enableAzureRBAC} onChange={(ev, val) => updateFn("enableAzureRBAC", val)} onRenderLabel={() => <Text styles={{root:{color: 'black'}}}>Azure RBAC for Kubernetes Authorization <Link target='_' href='https://docs.microsoft.com/en-us/azure/aks/manage-azure-rbac'>docs</Link>**</Text>} />
 
-
-          <TextField label="AAD group object IDs that will have admin role of the cluster." onChange={(ev, val) => updateFn("aadgroupids", val)} />
+          { !cluster.enableAzureRBAC && 
+            <>
+            <TextField label="AAD Group objectIDs that will have admin role of the cluster ',' seperated" onChange={(ev, val) => updateFn("aadgroupids", val)} value={cluster.aadgroupids}/>
+            { cluster.enable_aad && !cluster.aadgroupids &&
+              <MessageBar messageBarType={MessageBarType.warning}>You will be forbidden to do any kubernetes options unless you add a AAD Groups here, or follow <Link target='_' href='https://docs.microsoft.com/en-us/azure/aks/azure-ad-rbac#create-the-aks-cluster-resources-for-app-devs'>this</Link> after the cluster is created</MessageBar>
+            }
+            </>
+          }
 
             </Stack>
           ) : invalidFn("aad_tenant_id", false)}
@@ -725,20 +735,11 @@ function ClusterScreen({ cluster, updateFn, invalidFn }) {
           onChange={(ev, opt) => updateFn("apisecurity", opt.key)}
         />
       </Stack.Item>
+
+      <Stack.Item align="center" styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
+      <TextField label="IP Addresses that can access your cluster API Server (',' seperated)" onChange={(ev, val) => updateFn("apiips", val)} value={cluster.apiips}/>
+      </Stack.Item>
       
-      <Label required={true}>
-            Network Plugin
-        </Label>
-
-      <Toggle
-        label="Do you need to limit your non-routable IP usage on your network (use network calculator)"
-        checked={cluster.networkPlugin === 'kubenet'}
-        onText="Yes - Use 'networkPlugin' so your PODs do not receive VNET IPs"
-        offText="No - Use 'CNI' for fastest container networking"
-        onChange={(ev, val) => updateFn("networkPlugin", val? 'kubenet' : 'azure')}
-      // styles={{ label: {fontWeight: "regular"}}}
-      />
-
     </Stack>
 
   )
@@ -764,12 +765,30 @@ function AddonsScreen({ cluster, addons, updateFn, invalidFn }) {
           selectedKey={addons.monitor}
           options={[
             { key: 'none', text: 'None' },
-            { key: 'aci', text: 'Azure Monitor for Containers' },
-            { key: 'oss', text: 'Promethous / Grahana Helm Chart' }
+            { key: 'aci', text: 'Azure Monitor for Containers (logs and metrics)' },
+            { key: 'oss', text: 'Promethous / Grahana Helm Chart (metrics only)' }
 
           ]}
           onChange={(ev, opt) => updateFn("monitor", opt.key)}
         />
+      </Stack.Item>
+      <Stack.Item align="center" styles={{ root: { display: (addons.monitor !== "aci" ? "none" : "block") } }} >
+
+        <Dropdown
+              label="Log and Metrics Data Retention (Days)"
+              onChange={(ev, val) => updateFn("retentionInDays", val)} selectedKey={addons.retentionInDays}
+              options={[
+              { key: 30, text: '30 Days' },
+              { key: 60, text: '60 Days' },
+              { key: 90, text: '90 Days' },
+              { key: 120, text: '120 Days' },
+              { key: 180, text: '180 Days' },
+              { key: 270, text: '270 Days' },
+              { key: 365, text: '365 Days' },
+              { key: 270, text: '270 Days' },
+              { key: 365, text: '365 Days' }
+            ]}
+            />
       </Stack.Item>
 
       <Stack.Item align="start">
@@ -903,6 +922,21 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
   return (
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
+      <Label>Network Plugin</Label>
+
+      <Toggle
+        label="Do you need to limit your non-routable IP usage on your network (use network calculator)"
+        checked={net.networkPlugin === 'kubenet'}
+        onText="Yes - Use 'networkPlugin' so your PODs do not receive VNET IPs"
+        offText="No - Use 'CNI' for fastest container networking"
+        onChange={(ev, val) => updateFn("networkPlugin", val? 'kubenet' : 'azure')}
+      // styles={{ label: {fontWeight: "regular"}}}
+      />
+
+      <Label>Setup Azure firewll for your cluster egress</Label>
+      <Checkbox disabled={false} checked={net.afw} onChange={(ev, v) => updateFn("afw", v)} label="Implement Azure Firewall & UDR nexthop" />
+
+
       <Label>Select Default or Custom Networking Connectivity</Label>
       <div ref={_calloutTarget1} style={{ marginTop: 0, maxWidth: "220px" }}>
         <ChoiceGroup
@@ -969,9 +1003,6 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
         </Callout>
       )}
 
-      <Checkbox disabled={false} checked={net.afw} onChange={(ev, v) => updateFn("afw", v)} label="Implement Azure Firewall & UDR nexthop" />
-
-
       { net.custom_vnet &&
       
       <Stack styles={adv_stackstyle}>
@@ -1000,7 +1031,7 @@ function NetworkScreen({ net, updateFn, invalidFn, addons, cluster }) {
         <Stack {...columnProps}>
           <Label>Kubernetes Networking CIDRs</Label>
           <Stack.Item align="start">
-            <TextField prefix="Cidr" label="POD Network" disabled={cluster.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={cluster.networkPlugin ? net.podCidr : "N/A"} />
+            <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin ? net.podCidr : "N/A"} />
           </Stack.Item>
           <Stack.Item align="start">
             <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
