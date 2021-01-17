@@ -91,7 +91,7 @@ export default function PortalNav() {
     afw: false,
     vnetprivateend: false,
     serviceEndpointsEnable: false,
-    serviceEndpoints: [],
+    serviceEndpoints: ['Microsoft.ContainerRegistry'],
     custom_vnet: false,
     vnet: "10.0.0.0/8",
     akssub: "10.240.0.0/16",
@@ -977,7 +977,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
 
 
       <Label>Default or Custom VNET</Label>
-      <div ref={_calloutTarget1} style={{ marginTop: 0, maxWidth: "220px" }}>
+      <div ref={_calloutTarget1} style={{ marginTop: 0 }}>
         <ChoiceGroup
           selectedKey={net.custom_vnet}
           onClick={() => setCallout1(true)}
@@ -992,6 +992,12 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
               key: true,
               iconProps: { iconName: 'CityNext' }, // SplitObject
               text: 'Custom Networking'
+            },
+            {
+              key: 'custom',
+              disabled: true,
+              iconProps: { iconName: 'WebAppBuilderFragment' }, // SplitObject
+              text: 'BYO VNET (TBC)'
             }
           ]}
         />
@@ -1010,13 +1016,13 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
           <MessageBar messageBarType={MessageBarType.info}>Default - Fully Managed Networking</MessageBar>
           <div style={{ padding: "10px", maxWidth: "450px" }}>
             <Text >
-              Select this option if you <Text style={{ fontWeight: "bold" }} > don't</Text> require any "network layer" vnet with other VNET or On-Premises networks
-                This is the simplest AKS deployment to operate, it provides a <Text style={{ fontWeight: "bold" }} >full managed</Text> network setup
+              Select this option if you <Text style={{ fontWeight: "bold" }} > don't</Text> require any custom IP settings, so you are not peering with other VNETs or On-Premises networks
+                This is the simplest AKS deployment to operate, it provides a <Text style={{ fontWeight: "bold" }} > managed</Text> network setup, including:
               </Text>
             <ul>
-              <li>Dedicated VNET with private IP range for your agents</li>
-              <li>Container Networking. Performant PODs networking (CNI)</li>
-              <li>Standard LoadBalancer for services (internal or external)</li>
+              <li>New Dedicated VNET with private IP range for your agents nodes</li>
+              <li>Container Networking (default: CNI)</li>
+              <li>Standard LoadBalancer for kubernetes services with outbound rule for internet access</li>
             </ul>
           </div>
         </Callout>
@@ -1070,7 +1076,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
             <Stack {...columnProps}>
               <Label>Kubernetes Networking CIDRs</Label>
               <Stack.Item align="start">
-                <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin ? net.podCidr : "N/A"} />
+                <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin === 'kubenet' ? net.podCidr : "<POD IPs from subnet>"} />
               </Stack.Item>
               <Stack.Item align="start">
                 <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
