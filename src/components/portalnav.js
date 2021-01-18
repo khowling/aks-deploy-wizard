@@ -38,6 +38,15 @@ function useAITracking(componentName, key) {
 
 }
 
+function set_imm_del(prev, val) {
+  let ns = new Set(prev)
+  ns.delete(val)
+  return ns
+}
+
+function set_imm_add(prev, val) {
+  return new Set(prev).add(val)
+}
 
 export default function PortalNav() {
   const [key, setKey] = useState("0")
@@ -56,7 +65,6 @@ export default function PortalNav() {
   const [cluster, setCluster] = useState({
     //securityLevel: "normal",
     apisecurity: 'none',
-    apiips: '',
     policy: false,
     autoscale: false,
     upgradeChannel: 'none',
@@ -82,16 +90,16 @@ export default function PortalNav() {
     keyvaultcsi: false,
     podid: false,
     podscale: false,
-    reboot: false,
     monitor: "none",
-    retentionInDays: 30
+    retentionInDays: 30,
+    gitops: 'none'
   })
   const [net, setNet] = useState({
     networkPlugin: 'azure',
     afw: false,
     vnetprivateend: false,
     serviceEndpointsEnable: false,
-    serviceEndpoints: ['Microsoft.ContainerRegistry'],
+    serviceEndpoints: new Set(),
     custom_vnet: false,
     vnet: "10.0.0.0/8",
     akssub: "10.240.0.0/16",
@@ -105,6 +113,7 @@ export default function PortalNav() {
   const [deploy, setDeploy] = useState({
     clusterName: "",
     location: "WestEurope",
+    apiips: '',
     demoapp: false,
     disablePreviews: true
   })
@@ -112,28 +121,30 @@ export default function PortalNav() {
   useEffect(() => {
     setOperationsManaged()
     setSecurityNormal()
-
+    setNet((prev) => { return { ...prev, serviceEndpoints: set_imm_add(prev.serviceEndpoints, 'Microsoft.ContainerRegistry') } })
 
     fetch('https://api.ipify.org?format=json').then(response => {
       return response.json();
     }).then((res) => {
-      setCluster((prev) => { return { ...prev, apiips: res.ip } })
+      setDeploy((prev) => { return { ...prev, apiips: res.ip } })
     }).catch((err) => console.error('Problem fetching my IP', err))
 
 
   }, [])
 
+  function setOperationsManaged() {
+    setDefaultCluster('managed')
+    setCluster((prev) => { return { ...prev, autoscale: true, upgradeChannel: 'stable' } })
+    setAddons((prev) => { return { ...prev, registry: (net.vnetprivateend || net.serviceEndpointsEnable) ? 'Premium' : 'Basic', ingress: 'appgw', monitor: 'aci' } })
+    setNet((prev) => { return { ...prev, serviceEndpoints: prev.serviceEndpointsEnable ? set_imm_add(prev.serviceEndpoints, 'Microsoft.ContainerRegistry') : set_imm_del(prev.serviceEndpoints, 'Microsoft.ContainerRegistry') } })
+  }
   function setSecurityNormal() {
     setDefaultSecurity('normal')
     setCluster((prev) => { return { ...prev, enable_aad: true, apisecurity: 'whitelist', policy: true } })
-    setAddons((prev) => { return { ...prev, networkPolicy: 'calico', } })
-    setNet((prev) => { return { ...net, serviceEndpointsEnable: true, vnetprivateend: false, afw: false } })
+    setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none' } })
+    setNet((prev) => { return { ...prev, serviceEndpointsEnable: true, vnetprivateend: false, afw: false } })
   }
-  function setOperationsManaged() {
-    setDefaultCluster('managed')
-    setCluster((prev) => { return { ...cluster, autoscale: true, upgradeChannel: 'stable' } })
-    setAddons((prev) => { return { ...addons, registry: net.vnetprivateend ? 'Premium' : 'Basic', ingress: 'appgw', monitor: 'aci', reboot: true } })
-  }
+
 
   function _handleLinkClick(item) {
     setKey(item.props.itemKey)
@@ -157,8 +168,8 @@ export default function PortalNav() {
   invalidFn('deploy', 'clusterName', deploy.clusterName.match(/^[a-z0-9][_\-a-z0-9]+[a-z0-9]$/i) === null)
   invalidFn('cluster', 'osDiskType', cluster.osDiskType === 'Ephemperal' && !VMs.find(i => i.key === cluster.vmSize).eph)
   invalidFn('cluster', 'aad_tenant_id', cluster.enable_aad && cluster.use_alt_aad && cluster.aad_tenant_id.length !== 36)
-  invalidFn('net', 'serviceEndpoints', net.serviceEndpointsEnable && net.serviceEndpoints.length === 0)
-  invalidFn('addons', 'registry', net.vnetprivateend && (addons.registry !== 'Premium' && addons.registry !== 'none'))
+  invalidFn('net', 'serviceEndpoints', net.serviceEndpointsEnable && net.serviceEndpoints.size === 0)
+  invalidFn('addons', 'registry', (net.vnetprivateend || net.serviceEndpointsEnable) && (addons.registry !== 'Premium' && addons.registry !== 'none'))
 
   function _customRenderer(page, link, defaultRenderer) {
     return (
@@ -191,8 +202,9 @@ export default function PortalNav() {
             <Card
               onClick={() => {
                 setDefaultCluster('none')
-                setCluster({ ...cluster, autoscale: false, upgradeChannel: 'none' })
-                setAddons({ ...addons, registry: 'none', ingress: 'none', reboot: false, monitor: 'none' })
+                setCluster((prev) => { return { ...prev, autoscale: false, upgradeChannel: 'none' } })
+                setAddons((prev) => { return { ...prev, registry: 'none', ingress: 'none', monitor: 'none' } })
+                setNet((prev) => { return { ...prev, serviceEndpoints: set_imm_del(prev.serviceEndpoints, 'Microsoft.ContainerRegistry') } })
               }}
               tokens={{ childrenMargin: 12 }}
             >
@@ -213,8 +225,9 @@ export default function PortalNav() {
             <Card
               onClick={() => {
                 setDefaultCluster('oss')
-                setCluster({ ...cluster, autoscale: false, upgradeChannel: 'none' })
-                setAddons({ ...addons, registry: 'none', ingress: 'nginx', reboot: false, monitor: 'oss' })
+                setCluster((prev) => { return { ...prev, autoscale: false, upgradeChannel: 'none' } })
+                setAddons((prev) => { return { ...prev, registry: 'none', ingress: 'nginx', monitor: 'oss' } })
+                setNet((prev) => { return { ...prev, serviceEndpoints: set_imm_del(prev.serviceEndpoints, 'Microsoft.ContainerRegistry') } })
               }}
               tokens={{ childrenMargin: 12 }}
             >
@@ -274,9 +287,9 @@ export default function PortalNav() {
             <Card
               onClick={() => {
                 setDefaultSecurity('low')
-                setCluster({ ...cluster, enable_aad: false, apisecurity: 'none', policy: false })
-                setAddons((prev) => { return { ...prev, networkPolicy: 'none', } })
-                setNet({ ...net, serviceEndpointsEnable: false, vnetprivateend: true, afw: false })
+                setCluster((prev) => { return { ...prev, enable_aad: false, apisecurity: 'none', policy: false } })
+                setAddons((prev) => { return { ...prev, networkPolicy: 'none', registry: prev.registry !== 'none' ? 'Basic' : 'none' } })
+                setNet({ ...net, serviceEndpointsEnable: false, vnetprivateend: false, afw: false })
               }}
               tokens={{ childrenMargin: 12 }}
             >
@@ -309,7 +322,7 @@ export default function PortalNav() {
                     <li>Restrict privileged workloads (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
                     <li>East-West traffic control (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/use-network-policies">docs</a>)</li>
                     <li>Authorized IP address ranges (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges">docs</a>)</li>
-                    <li>Secure dependent azure services to aks (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview">docs</a>)</li>
+                    <li>Firewall dependencies with Service Endpoints (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview">docs</a>)</li>
                   </ul>
                 </div>
               </Card.Item>
@@ -319,7 +332,7 @@ export default function PortalNav() {
               onClick={() => {
                 setDefaultSecurity('high')
                 setCluster({ ...cluster, enable_aad: true, apisecurity: 'private', policy: true })
-                setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: 'Premium' } })
+                setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none' } })
                 setNet({ ...net, serviceEndpointsEnable: false, vnetprivateend: true, afw: true })
               }}
               tokens={{ childrenMargin: 12 }}
@@ -340,7 +353,7 @@ export default function PortalNav() {
                     <li>Restrict privileged workloads (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
                     <li>East-West traffic control (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/use-network-policies">docs</a>)</li>
                     <li>Private cluster (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/private-clusters">docs</a>)</li>
-                    <li>Private Link dependencies & "Premium" Container Registry (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/private-link/private-link-overview">docs</a>)</li>
+                    <li>Private Link dependencies (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/private-link/private-link-overview">docs</a>)</li>
                     <li>Restrict egress with Azure firewall (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/limit-egress-traffic#restrict-egress-traffic-using-azure-firewall">docs</a>)</li>
                     {/*  <li>Confidential computing nodes (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/confidential-computing/confidential-nodes-aks-overview">docs</a>)</li>
                 */}
@@ -387,6 +400,7 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
       }
     }
   */
+  const apiips_array = deploy.apiips.split(',').filter(x => x.trim())
   let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg
 az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` +
     ` kubernetesVersion=${process.env.REACT_APP_K8S_VERSION}` +
@@ -399,13 +413,12 @@ az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_
     (cluster.enable_aad ? ` enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id={$cluster.aad_tenant_id} ` : '')}` : '') +
     (addons.registry !== 'none' ? ` registries_sku=${addons.registry}` : '') +
     (net.afw ? ` azureFirewalls=true` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.length > 0 ? ` serviceEndpoints="${JSON.stringify(net.serviceEndpoints.map(s => { return { service: s } })).replaceAll('"', '\\"')}" ` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? ` serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}" ` : '') +
     (addons.monitor === 'aci' ? ` omsagent=true retentionInDays=${addons.retentionInDays}` : "") +
     (addons.networkPolicy !== 'none' ? ` networkPolicy=${addons.networkPolicy}` : '') +
     (net.networkPlugin !== 'azure' ? ` networkPlugin=${net.networkPlugin}` : '') +
-    (cluster.apisecurity === 'whitelist' && cluster.apiips ? ` authorizedIPRanges="${JSON.stringify(cluster.apiips.split(',')).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
+    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? ` authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
     (cluster.apisecurity === 'private' ? ` enablePrivateCluster=true` : '')
-
 
   /*
     let features = 
@@ -419,8 +432,9 @@ az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_
   let preview_features =
     (cluster.enable_aad && cluster.enableAzureRBAC ? ' enableAzureRBAC=true' : '') +
     (cluster.upgradeChannel !== 'none' ? ` upgradeChannel=${cluster.upgradeChannel}` : '') +
+    (addons.gitops !== 'none' ? ` gitops=${addons.gitops}` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '') +
     (addons.ingress === 'appgw' ? ` ingressApplicationGateway=true` : '')
-
   const getcreds = `
 az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
 
@@ -466,6 +480,10 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
         </Stack>
         <Stack styles={{ root: { width: "300px" } }}>
           <TextField label="Kubernetes version" readOnly={true} disabled={true} value={process.env.REACT_APP_K8S_VERSION} />
+
+          <Stack.Item align="center" styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
+            <TextField label="Whitelisted IP or CIDR's  (',' seperated)" onChange={(ev, val) => updateFn("apiips", val)} value={deploy.apiips} required={cluster.apisecurity === "whitelist"} />
+          </Stack.Item>
         </Stack>
 
 
@@ -486,7 +504,7 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
       { preview_features.length > 0 &&
         <MessageBar messageBarType={MessageBarType.warning}>
           <Text >Your deployment contains Preview features: <b>{preview_features}</b>, Ensure you have registered for ALL these previews before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
-          <Toggle styles={{ root: { marginTop: "10px" } }} onText='preview disabled' offText="preview enabled" checked={deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", checked)} />
+          <Toggle styles={{ root: { marginTop: "10px" } }} onText='preview enabled' offText="preview disabled" checked={!deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", !checked)} />
         </MessageBar>
 
       }
@@ -499,6 +517,27 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
       <TextField readOnly={true} label="Command" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`${armcmd}${deploy.disablePreviews ? '' : preview_features}${getcreds}`} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
       <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
 
+      { addons.gitops !== 'none' &&
+        <>
+          <Separator ><b>Post Deployment</b></Separator>
+          <TextField readOnly={true} label="While Gitops is in preview, run this manually" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`az k8sconfiguration create
+     --name cluster-config 
+     --cluster-name ${deploy.clusterName}    
+     --resource-group ${deploy.clusterName}-rg     
+     --operator-instance-name flux     
+     --operator-namespace cluster-config     
+     --enable-helm-operator     
+     --operator-params='--git-readonly --git-path=cluster-config'     
+     --repository-url git://github.com/khowling/aks-deploy-arm.git     
+     --scope cluster     
+     --helm-operator-params='--set helm.versions=v3'     
+     --cluster-type managedclusters`} />
+
+        </>
+
+
+
+      }
 
     </Stack>
   )
@@ -736,10 +775,6 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
         />
       </Stack.Item>
 
-      <Stack.Item align="center" styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
-        <TextField label="IP ir CIDR Addresses that can access your cluster API Server (',' seperated)" onChange={(ev, val) => updateFn("apiips", val)} value={cluster.apiips} />
-      </Stack.Item>
-
     </Stack>
 
   )
@@ -882,16 +917,35 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
             { key: 'none', text: 'No, my application images will be on dockerhub or another registry' },
             { key: 'Basic', text: 'Yes, setup Azure Container Registry "Basic" tier & authorise aks to pull images' },
             { key: 'Standard', text: 'Yes, setup Azure Container Registry "Standard" tier (recommended for production)' },
-            { key: 'Premium', text: 'Yes, setup Azure Container Registry "Premium" tier (required for Private Link)' }
+            { key: 'Premium', text: 'Yes, setup Azure Container Registry "Premium" tier (required for Service Endpoints & Private Link)' }
           ]}
           onChange={(ev, { key }) => updateFn("registry", key)}
         />
         {invalidArray.includes('registry') &&
-          <MessageBar messageBarType={MessageBarType.error}>Premium Teir is required for Private Link, either select "Premium", or disable Private Link</MessageBar>
+          <MessageBar messageBarType={MessageBarType.error}>Premium Teir is required for Service Endpoints & Private Link, either select "Premium", or disable Service Endpoints and Private Link</MessageBar>
         }
       </Stack.Item>
 
       <Separator className="notopmargin" />
+      {/* 
+      <ChoiceGroup
+        label='Enable gitops'
+        selectedKey={addons.gitops}
+        options={[
+          { key: 'none', text: 'No, I will manage my kubernetes deployments manually' },
+          { key: 'yes', text: 'Yes, enable gitops' }
+        ]}
+        onChange={(ev, { key }) => updateFn("gitops", key)}
+      />
+      */}
+    </Stack>
+  )
+}
+
+function ApplicationScreen({ cluster, addons, updateFn, invalidArray }) {
+
+  return (
+    <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
       <Label required={true}>
         My Application will use the following features (TBC)
@@ -903,7 +957,6 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
           <Checkbox checked={addons.podscale} onChange={(ev, val) => updateFn("podscale", val)} label="Automatically set the 'requests'  based on usage and thus allow proper scheduling onto nodes (vertical-pod-autoscaler)" />
         </Stack>
       </Stack.Item>
-
     </Stack>
   )
 }
@@ -943,12 +996,10 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
               required={true}
               placeholder="Select options"
               label="Select the Azure Dependencies you would like to secure to your AKS VNET"
-              selectedKeys={net.serviceEndpoints}
+              selectedKeys={Array.from(net.serviceEndpoints)}
               // eslint-disable-next-line react/jsx-no-bind
-              onChange={(ev, item) => {
-                if (item) {
-                  updateFn("serviceEndpoints", item.selected ? [...net.serviceEndpoints, item.key] : net.serviceEndpoints.filter(key => key !== item.key))
-                }
+              onChange={(ev, { key, selected }) => {
+                updateFn("serviceEndpoints", selected ? net.serviceEndpoints.add(key) : set_imm_del(net.serviceEndpoints, key))
               }}
               multiSelect
               options={[
@@ -1003,7 +1054,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
         />
       </div>
 
-      { callout1 && !net.custom_vnet && (
+      {callout1 && !net.custom_vnet && (
         <Callout
           className="ms-CalloutExample-callout"
           target={_calloutTarget1}
@@ -1029,7 +1080,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
       )}
 
 
-      { callout1 && net.custom_vnet && (
+      {callout1 && net.custom_vnet && (
         <Callout
           className="ms-CalloutExample-callout"
           target={_calloutTarget1}
@@ -1048,7 +1099,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
         </Callout>
       )}
 
-      { net.custom_vnet &&
+      {net.custom_vnet &&
 
         <Stack styles={adv_stackstyle}>
           <Label>Custom Network configration</Label>
