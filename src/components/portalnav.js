@@ -14,7 +14,7 @@ const optionRootClass = mergeStyles({
   alignItems: 'baseline'
 });
 
-const adv_stackstyle = { root: { border: "1px solid", background: "#fcfcfc", margin: "10px 0", padding: "15px", height: "1100px" } }
+const adv_stackstyle = { root: { border: "1px solid", background: "#fcfcfc", margin: "10px 0", padding: "15px", height: "1300px" } }
 
 const iconClass = mergeStyles({
   fontSize: 80,
@@ -65,7 +65,6 @@ export default function PortalNav() {
   const [cluster, setCluster] = useState({
     //securityLevel: "normal",
     apisecurity: 'none',
-    policy: false,
     autoscale: false,
     upgradeChannel: 'none',
     count: 2,
@@ -77,10 +76,12 @@ export default function PortalNav() {
     use_alt_aad: false,
     aad_tenant_id: "",
     enableAzureRBAC: true,
-    aadgroupids: ""
+    adminprincipleid: '',
+    aadgroupids: ''
   })
   const [addons, setAddons] = useState({
     networkPolicy: 'none',
+    azurepolicy: 'none',
     ingress: 'none',
     certMan: false,
     certEmail: "",
@@ -140,8 +141,8 @@ export default function PortalNav() {
   }
   function setSecurityNormal() {
     setDefaultSecurity('normal')
-    setCluster((prev) => { return { ...prev, enable_aad: true, apisecurity: 'whitelist', policy: true } })
-    setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none' } })
+    setCluster((prev) => { return { ...prev, enable_aad: true, apisecurity: 'whitelist' } })
+    setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none', azurepolicy: 'audit' } })
     setNet((prev) => { return { ...prev, serviceEndpointsEnable: true, vnetprivateend: false, afw: false } })
   }
 
@@ -168,8 +169,9 @@ export default function PortalNav() {
   invalidFn('deploy', 'clusterName', deploy.clusterName.match(/^[a-z0-9][_\-a-z0-9]+[a-z0-9]$/i) === null)
   invalidFn('cluster', 'osDiskType', cluster.osDiskType === 'Ephemperal' && !VMs.find(i => i.key === cluster.vmSize).eph)
   invalidFn('cluster', 'aad_tenant_id', cluster.enable_aad && cluster.use_alt_aad && cluster.aad_tenant_id.length !== 36)
-  invalidFn('net', 'serviceEndpoints', net.serviceEndpointsEnable && net.serviceEndpoints.size === 0)
+  //invalidFn('net', 'serviceEndpoints', net.serviceEndpointsEnable && net.serviceEndpoints.size === 0)
   invalidFn('addons', 'registry', (net.vnetprivateend || net.serviceEndpointsEnable) && (addons.registry !== 'Premium' && addons.registry !== 'none'))
+  invalidFn('deploy', 'apiips', cluster.apisecurity === 'whitelist' && deploy.apiips.length < 7)
 
   function _customRenderer(page, link, defaultRenderer) {
     return (
@@ -287,8 +289,8 @@ export default function PortalNav() {
             <Card
               onClick={() => {
                 setDefaultSecurity('low')
-                setCluster((prev) => { return { ...prev, enable_aad: false, apisecurity: 'none', policy: false } })
-                setAddons((prev) => { return { ...prev, networkPolicy: 'none', registry: prev.registry !== 'none' ? 'Basic' : 'none' } })
+                setCluster((prev) => { return { ...prev, enable_aad: false, apisecurity: 'none' } })
+                setAddons((prev) => { return { ...prev, networkPolicy: 'none', registry: prev.registry !== 'none' ? 'Basic' : 'none', azurepolicy: 'none' } })
                 setNet({ ...net, serviceEndpointsEnable: false, vnetprivateend: false, afw: false })
               }}
               tokens={{ childrenMargin: 12 }}
@@ -319,7 +321,7 @@ export default function PortalNav() {
                 <div style={{ fontSize: "12px" }} >Good option for implmenting recommended minimum security controls for regular environments
               <ul>
                     <li>AAD Integration (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/managed-aad">docs</a>)</li>
-                    <li>Restrict privileged workloads (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
+                    <li>AUDIT Pod security baseline standards (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
                     <li>East-West traffic control (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/use-network-policies">docs</a>)</li>
                     <li>Authorized IP address ranges (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges">docs</a>)</li>
                     <li>Firewall dependencies with Service Endpoints (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview">docs</a>)</li>
@@ -331,8 +333,8 @@ export default function PortalNav() {
             <Card
               onClick={() => {
                 setDefaultSecurity('high')
-                setCluster({ ...cluster, enable_aad: true, apisecurity: 'private', policy: true })
-                setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none' } })
+                setCluster({ ...cluster, enable_aad: true, apisecurity: 'private' })
+                setAddons((prev) => { return { ...prev, networkPolicy: 'calico', registry: prev.registry !== 'none' ? 'Premium' : 'none', azurepolicy: 'deny' } })
                 setNet({ ...net, serviceEndpointsEnable: false, vnetprivateend: true, afw: true })
               }}
               tokens={{ childrenMargin: 12 }}
@@ -350,7 +352,7 @@ export default function PortalNav() {
 
                 <ul>
                     <li>AAD Integration (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/managed-aad">docs</a>)</li>
-                    <li>Restrict privileged workloads (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
+                    <li>ENFORCE Pod security baseline standards (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/governance/policy/concepts/policy-for-kubernetes">docs</a>)</li>
                     <li>East-West traffic control (<a target="_nsg" href="https://docs.microsoft.com/en-gb/azure/aks/use-network-policies">docs</a>)</li>
                     <li>Private cluster (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/aks/private-clusters">docs</a>)</li>
                     <li>Private Link dependencies (<a target="_nsg" href="https://docs.microsoft.com/en-us/azure/private-link/private-link-overview">docs</a>)</li>
@@ -401,24 +403,26 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
     }
   */
   const apiips_array = deploy.apiips.split(',').filter(x => x.trim())
-  let armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg
-az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` +
-    ` kubernetesVersion=${process.env.REACT_APP_K8S_VERSION}` +
-    ` resourceName=${deploy.clusterName}` +
-    (cluster.vmSize !== 'default' ? ` agentVMSize=${cluster.vmSize}` : '') +
-    ` agentCount=${cluster.count}` +
-    (cluster.autoscale ? ` agentCountMax=${cluster.maxCount}` : '') +
-    (cluster.osDiskType === 'Managed' ? ` osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? ` osDiskSizeGB={$cluster.osDiskSizeGB}` : '')}` : '') +
-    (net.custom_vnet ? ' custom_vnet=true' : '') +
-    (cluster.enable_aad ? ` enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id={$cluster.aad_tenant_id} ` : '')}` : '') +
-    (addons.registry !== 'none' ? ` registries_sku=${addons.registry}` : '') +
-    (net.afw ? ` azureFirewalls=true` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? ` serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}" ` : '') +
-    (addons.monitor === 'aci' ? ` omsagent=true retentionInDays=${addons.retentionInDays}` : "") +
-    (addons.networkPolicy !== 'none' ? ` networkPolicy=${addons.networkPolicy}` : '') +
-    (net.networkPlugin !== 'azure' ? ` networkPlugin=${net.networkPlugin}` : '') +
-    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? ` authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
-    (cluster.apisecurity === 'private' ? ` enablePrivateCluster=true` : '')
+  const armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \\\n` +
+    `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters \\\n` +
+    `   kubernetesVersion=${process.env.REACT_APP_K8S_VERSION} \\\n` +
+    `   resourceName=${deploy.clusterName} \\\n` +
+    (cluster.vmSize !== 'default' ? `   agentVMSize=${cluster.vmSize} \\\n` : '') +
+    `   agentCount=${cluster.count} \\\n` +
+    (cluster.autoscale ? `   agentCountMax=${cluster.maxCount} \\\n` : '') +
+    (cluster.osDiskType === 'Managed' ? `   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB={$cluster.osDiskSizeGB}` : '')} \\\n` : '') +
+    (net.custom_vnet ? '   custom_vnet=true \\\n' : '') +
+    (cluster.enable_aad ? `   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id={$cluster.aad_tenant_id}` : '')} \\\n` : '') +
+    (addons.registry !== 'none' ? `   registries_sku=${addons.registry} \\\n` : '') +
+    (net.afw ? `   azureFirewalls=true \\\n` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? `   serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}" \\\n` : '') +
+    (addons.monitor === 'aci' ? `   omsagent=true retentionInDays=${addons.retentionInDays} \\\n` : "") +
+    (addons.networkPolicy !== 'none' ? `   networkPolicy=${addons.networkPolicy} \\\n` : '') +
+    (addons.azurepolicy !== 'none' ? `   azurepolicy=${addons.azurepolicy} \\\n` : '') +
+    (net.networkPlugin !== 'azure' ? `   networkPlugin=${net.networkPlugin} \\\n` : '') +
+    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? `   authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}" \\\n` : '') +
+    (cluster.apisecurity === 'private' ? `   enablePrivateCluster=true \\\n` : '')
+
 
   /*
     let features = 
@@ -426,24 +430,26 @@ az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_
       (addons.podid ? "-a podid " : "") + 
       (addons.keyvaultcsi ? "-a keyvaultcsi " : "") + 
       (addons.reboot ? ' -a kured ':'') + 
-      (cluster.autoscale ? ` -a clustrautoscaler=${cluster.maxCount} `:'') + 
-      (cluster.apisecurity !== 'none' ? ` apisecurity=${cluster.apisecurity} `:'') 
+      (cluster.autoscale ? ` - a clustrautoscaler = ${ cluster.maxCount } `:'') + 
+      (cluster.apisecurity !== 'none' ? ` apisecurity = ${ cluster.apisecurity } `:'') 
   */
-  let preview_features =
-    (cluster.enable_aad && cluster.enableAzureRBAC ? ' enableAzureRBAC=true' : '') +
-    (cluster.upgradeChannel !== 'none' ? ` upgradeChannel=${cluster.upgradeChannel}` : '') +
-    (addons.gitops !== 'none' ? ` gitops=${addons.gitops}` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '') +
-    (addons.ingress === 'appgw' ? ` ingressApplicationGateway=true` : '')
-  const getcreds = `
-az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
+  const preview_features =
+    (cluster.enable_aad && cluster.enableAzureRBAC ? '   enableAzureRBAC=true \\\n' : '') +
+    (cluster.upgradeChannel !== 'none' ? `   upgradeChannel=${cluster.upgradeChannel} \\\n` : '') +
+    (addons.gitops !== 'none' ? `   gitops=${addons.gitops} \\\n` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? `   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'} \\\n` : '') +
+    (addons.ingress === 'appgw' ? `   ingressApplicationGateway=true \\\n` : '')
+
+
+  const getcreds = `az aks get-credentials - g ${deploy.clusterName} -rg - n ${deploy.clusterName} --admin \\\n` +
+    '#  TO BE COMPLETED'
 
   //? 'az feature register --name AKS-IngressApplicationGatewayAddon --namespace Microsoft.ContainerService' : '') +
-  //(` -a ${addons.ingress} ` + (addons.dns && cluster.securityLevel === "normal" ? ` -a dns=${addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8]}` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` -a cert=${addons.certEmail}` : "")) : "") + 
+  //(` - a ${ addons.ingress } ` + (addons.dns && cluster.securityLevel === "normal" ? ` - a dns = ${ addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8] } ` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` - a cert = ${ addons.certEmail } ` : "")) : "") + 
   //(cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")
 
 
-  //let deploy_str = `wget -qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
+  //let deploy_str = `wget - qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
   //  tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
   //  ./deploy.sh -l ${deploy.location} ${cluster.networkPlugin ? " -n networkPlugin " : ""} -c ${cluster.count} ${cluster.vmSize !== 'default' ? "-v " + cluster.vmSize : ""} ${cluster.osDiskSizeGB > 0 ? "-o " + cluster.osDiskSizeGB : ""} ${deploy.demoapp ? "-d" : ""} ${aad_cmd}  \\
   //  ${features} ${deploy.disablePreviews ? "" : preview_features} \\
@@ -478,12 +484,13 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
             styles={{ dropdown: { width: 300 } }}
           />
         </Stack>
-        <Stack styles={{ root: { width: "300px" } }}>
+        <Stack tokens={{ childrenGap: 20 }} styles={{ root: { width: "450px" } }}>
           <TextField label="Kubernetes version" readOnly={true} disabled={true} value={process.env.REACT_APP_K8S_VERSION} />
 
-          <Stack.Item align="center" styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
-            <TextField label="Whitelisted IP or CIDR's  (',' seperated)" onChange={(ev, val) => updateFn("apiips", val)} value={deploy.apiips} required={cluster.apisecurity === "whitelist"} />
+          <Stack.Item styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
+            <TextField label="Initial api server whitelisted IPs/CIDRs  (',' seperated)" errorMessage={invalidArray.includes('apiips') ? "Enter an IP/CIDR, or disable API Security in 'Cluster Details' tab" : ""} onChange={(ev, val) => updateFn("apiips", val)} value={deploy.apiips} required={cluster.apisecurity === "whitelist"} />
           </Stack.Item>
+
         </Stack>
 
 
@@ -499,7 +506,7 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
           checked={deploy.demoapp} onText="Yes" offText="No" onChange={(ev, checked) => updateFn("demoapp", checked)} />
       */}
 
-      <Separator ><b>Deploy Cluster</b></Separator>
+      <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Deploy Cluster</b></Separator>
 
       { preview_features.length > 0 &&
         <MessageBar messageBarType={MessageBarType.warning}>
@@ -508,18 +515,26 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
         </MessageBar>
 
       }
-      { (addons.monitor === 'oss' || addons.ingress === 'nginx') &&
+      {/* (addons.monitor === 'oss' || addons.ingress === 'nginx') &&
         <MessageBar messageBarType={MessageBarType.warning}>
           <Text >Your deployment contains Opensource community solutions, these solutions are not managed by Microsoft, you will be responsible for managing the lifecycle of these solutions</Text>
         </MessageBar>
 
-      }
-      <TextField readOnly={true} label="Command" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`${armcmd}${deploy.disablePreviews ? '' : preview_features}${getcreds}`} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
+    */}
+      <TextField readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={16} value={`${armcmd}${deploy.disablePreviews ? '' : preview_features}`} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
       <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
 
-      { addons.gitops !== 'none' &&
-        <>
-          <Separator ><b>Post Deployment</b></Separator>
+      <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Next Steps</b></Separator>
+
+      { addons.gitops === 'none' ?
+        <Stack>
+          <Label>Run these commands to install the requeted kubernetes packages into your cluster</Label>
+          <MessageBar>Once available, we will switch to using the gitops addon here, to assure that your clusters get their source of truth from the defined git repo</MessageBar>
+          <TextField readOnly={true} label="Commands (requires helm)" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`${getcreds}`} />
+        </Stack>
+        :
+        <Stack>
+
           <TextField readOnly={true} label="While Gitops is in preview, run this manually" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`az k8sconfiguration create
      --name cluster-config 
      --cluster-name ${deploy.clusterName}    
@@ -533,10 +548,7 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName}`
      --helm-operator-params='--set helm.versions=v3'     
      --cluster-type managedclusters`} />
 
-        </>
-
-
-
+        </Stack>
       }
 
     </Stack>
@@ -561,7 +573,7 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
       <Label style={{ marginBottom: "10px" }}>Cluster Performance & Scale Requirements (system nodepool)</Label>
-      <Stack vertical tokens={{ childrenGap: 15 }} style={{ marginTop: 0 }} >
+      <Stack vertical tokens={{ childrenGap: 15 }} style={{ marginTop: 0, marginLeft: '50px' }} >
 
         <Stack horizontal tokens={{ childrenGap: 150 }}>
           <Stack.Item>
@@ -668,26 +680,33 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
         </Stack>
       </Stack>
 
+      <Separator className="notopmargin" />
+
       <Stack.Item align="start">
         <Label required={true}>
           Cluster Auto-upgrade
         </Label>
         <ChoiceGroup
           selectedKey={cluster.upgradeChannel}
+          styles={{ root: { marginLeft: '50px' } }}
           options={[
             { key: 'none', text: 'Disables auto-upgrades' },
-            { key: 'patch', text: 'Automatically upgrade the cluster to the latest supported patch version when it becomes available while keeping the minor version the same.' },
-            { key: 'stable', text: 'Automatically upgrade the cluster to the latest supported patch release on minor version N-1, where N is the latest supported minor version' },
-            { key: 'rapid', text: 'Automatically upgrade the cluster to the latest supported patch release on the latest supported minor version.' }
+            { key: 'patch', text: 'Patch: auto-upgrade cluster to the latest supported patch version when it becomes available while keeping the minor version the same.' },
+            { key: 'stable', text: 'Stable: auto-upgrade cluster to the latest supported patch release on minor version N-1, where N is the latest supported minor version' },
+            { key: 'rapid', text: 'Rapid: auto-upgrade cluster to the latest supported patch release on the latest supported minor version.' }
 
           ]}
           onChange={(ev, { key }) => updateFn("upgradeChannel", key)}
         />
       </Stack.Item>
 
+      <Separator className="notopmargin" />
+
       <Stack horizontal tokens={{ childrenGap: 142 }} styles={{ root: { marginTop: 10 } }}>
         <Stack.Item>
-          <ChoiceGroup label={<Label>Cluster User Authentication <Link target="_" href="https://docs.microsoft.com/en-gb/azure/aks/managed-aad">docs</Link></Label>}
+          <ChoiceGroup
+            styles={{ root: { marginLeft: '50px' } }}
+            label={<Label>Cluster User Authentication <Link target="_" href="https://docs.microsoft.com/en-gb/azure/aks/managed-aad">docs</Link></Label>}
             selectedKey={cluster.enable_aad}
             onChange={(ev, { key }) => updateFn("enable_aad", key)}
             options={[
@@ -745,19 +764,26 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
 
               <Checkbox checked={cluster.enableAzureRBAC} onChange={(ev, val) => updateFn("enableAzureRBAC", val)} onRenderLabel={() => <Text styles={{ root: { color: 'black' } }}>Azure RBAC for Kubernetes Authorization <Link target='_' href='https://docs.microsoft.com/en-us/azure/aks/manage-azure-rbac'>docs</Link>**</Text>} />
 
-              {!cluster.enableAzureRBAC &&
+              {!cluster.enableAzureRBAC ?
                 <>
                   <TextField label="AAD Group objectIDs that will have admin role of the cluster ',' seperated" onChange={(ev, val) => updateFn("aadgroupids", val)} value={cluster.aadgroupids} />
                   {cluster.enable_aad && !cluster.aadgroupids &&
                     <MessageBar messageBarType={MessageBarType.warning}>You will be forbidden to do any kubernetes options unless you add a AAD Groups here, or follow <Link target='_' href='https://docs.microsoft.com/en-us/azure/aks/azure-ad-rbac#create-the-aks-cluster-resources-for-app-devs'>this</Link> after the cluster is created</MessageBar>
                   }
                 </>
+                :
+                <>
+                  <Label>Assign Cluster Admin Role to user (optional)</Label>
+                  <MessageBar styles={{ root: { marginBottom: '10px' } }}>Get your user principleId by running <Label>az ad user show --id `{'<work-email>'}` --query objectId --out tsv</Label></MessageBar>
+                  <TextField prefix="AAD PrincipleId" onChange={(ev, val) => updateFn("adminprincipleid", val)} value={cluster.adminprincipleid} />
+                </>
               }
-
             </Stack>
           }
         </Stack.Item>
       </Stack>
+
+      <Separator className="notopmargin" />
 
       <Stack.Item align="start">
         <Label required={true}>
@@ -765,6 +791,7 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
         </Label>
         <ChoiceGroup
           selectedKey={cluster.apisecurity}
+          styles={{ root: { marginLeft: '50px' } }}
           options={[
             { key: 'none', text: 'Public IP with no IP restrictions' },
             { key: 'whitelist', text: 'Create allowed IP ranges (defaults to IP address of machine running the script)' },
@@ -793,19 +820,21 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
 
       <Stack.Item align="start">
         <Label >Cluster Monitoring requirements</Label>
+        <MessageBar>Observing your clusters health is critical to smooth operations, select the managed Azure Monior for Containers option, or the opensource CNCF Promethous/Grafana solution</MessageBar>
         <ChoiceGroup
+          styles={{ root: { marginLeft: '50px' } }}
           selectedKey={addons.monitor}
           options={[
             { key: 'none', text: 'None' },
             { key: 'aci', text: 'Azure Monitor for Containers (logs and metrics)' },
-            { key: 'oss', text: 'Promethous / Grahana Helm Chart (metrics only)' }
+            { key: 'oss', text: 'Promethous / Grafana Helm Chart (metrics only)' }
 
           ]}
           onChange={(ev, { key }) => updateFn("monitor", key)}
         />
       </Stack.Item>
-      <Stack.Item align="center" styles={{ root: { display: (addons.monitor !== "aci" ? "none" : "block") } }} >
 
+      <Stack.Item align="center" styles={{ root: { width: '600px', display: (addons.monitor !== "aci" ? "none" : "block") } }} >
         <Dropdown
           label="Log and Metrics Data Retention (Days)"
           onChange={(ev, val) => updateFn("retentionInDays", val)} selectedKey={addons.retentionInDays}
@@ -823,42 +852,75 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
         />
       </Stack.Item>
 
+      <Separator className="notopmargin" />
+
       <Stack.Item align="start">
-        <Label >Cluster East-West traffic restrictions</Label>
+
+        <Label >Azure Policy, to manage and report on the compliance state of your Kubernetes clusters</Label>
+        <MessageBar>Azure Policy extends Gatekeeper v3, an admission controller webhook for Open Policy Agent (OPA), to apply at-scale enforcements and safeguards on your clusters in a centralized, consistent manner.
+        </MessageBar>
         <ChoiceGroup
+          styles={{ root: { marginLeft: '50px' } }}
+          selectedKey={addons.azurepolicy}
+          options={[
+            { key: 'none', text: 'No restrictions, users can deploy any kubernetes workloads' },
+            { key: 'audit', text: 'AUDIT complience with the set of cluster pod security baseline standards for Linux-based workloads' },
+            { key: 'deny', text: 'BLOCK and non-complient Linux-based workloads with the set of cluster pod security baseline standards' }
+          ]}
+          onChange={(ev, { key }) => updateFn("azurepolicy", key)}
+        />
+        {addons.azurepolicy !== 'none' &&
+          <MessageBar messageBarType={MessageBarType.success} styles={{ root: { marginLeft: '50px', width: '700px' } }}>
+            The template will automatically assign and <b>{addons.azurepolicy}</b> the following Policies:
+          <ul>
+              <li>Do not allow privileged containers in Kubernetes cluster</li>
+              <li>Kubernetes cluster pods should only use approved host network and port range</li>
+              <li>Kubernetes cluster containers should not share host process ID or host IPC namespace</li>
+              <li>Kubernetes cluster containers should only use allowed capabilities</li>
+              <li>Kubernetes cluster pod hostPath volumes should only use allowed host paths</li>
+            </ul>
+          </MessageBar>
+        }
+      </Stack.Item>
+      <Separator className="notopmargin" />
+      <Stack.Item align="start">
+        <Label >Cluster East-West traffic restrictions (Network Policies)</Label>
+        <MessageBar>Control which components can communicate with each other. The principle of least privilege should be applied to how traffic can flow between pods in an Azure Kubernetes Service (AKS) cluster</MessageBar>
+        <ChoiceGroup
+          styles={{ root: { marginLeft: '50px' } }}
           selectedKey={addons.networkPolicy}
           options={[
             { key: 'none', text: 'No restrictions, all PODs can access each other' },
-            { key: 'calico', text: 'Install Calico to implemented intra-cluster traffic restrictions' },
-            { key: 'azure', text: 'Install the Azure Network Policy to implemented intra-cluster traffic restrictions' }
+            { key: 'calico', text: 'Use Network Pollicy addon with Calico to implemented intra-cluster traffic restrictions (driven from "NetworkPolicy" objects)' },
+            { key: 'azure', text: 'Use Network Pollicy addon with Azure provider to implemented intra-cluster traffic restrictions (driven from "NetworkPolicy" objects)' }
 
           ]}
-          onChange={(ev, { key }) => updateFn("monitor", key)}
+          onChange={(ev, { key }) => updateFn("networkPolicy", key)}
         />
       </Stack.Item>
-
+      <Separator className="notopmargin" />
       <Stack.Item align="start">
         <Label required={true}>
-          Securely Expose your applications to the Internet via HTTPS
+          Securely Expose your applications via Layer 7 HTTP(S) proxies (Ingress Controller)
         </Label>
         <ChoiceGroup
+          styles={{ root: { marginLeft: '50px' } }}
           selectedKey={addons.ingress}
           options={[
-            { key: 'none', text: 'No, applications will not be exposed, or, I will configure my own solution' },
+            { key: 'none', text: 'No, I will configure my own solution' },
             { key: 'nginx', text: 'Yes, deploy nginx in the cluster to expose my apps to the internet (nginx ingress controller)' },
-            { key: 'appgw', text: 'Yes, deply an Azure Managed Gateway with WAF protection (Application Gateway)' }
+            { key: 'appgw', text: 'Yes, I want a Azure Managed Application Gateway with WAF protection' }
           ]}
           onChange={(ev, { key }) => updateFn("ingress", key)}
         />
       </Stack.Item>
 
-
       <Stack.Item align="center" styles={{ root: { maxWidth: '700px', display: (addons.ingress === "none" ? "none" : "block") } }} >
         <Stack tokens={{ childrenGap: 15 }}>
-          {addons.ingress === "nginx" && cluster.securityLevel !== "normal" &&
+          {addons.ingress === "nginx" && false &&
             <MessageBar messageBarType={MessageBarType.warning}>You requested a high security cluster & nginx public ingress. Please ensure you follow this information after deployment <Link target="_ar1" href="https://docs.microsoft.com/en-us/azure/firewall/integrate-lb#public-load-balancer">Asymmetric routing</Link></MessageBar>
           }
-          {addons.ingress !== "none" && cluster.securityLevel !== "normal" &&
+          {addons.ingress !== "none" && false &&
             <MessageBar messageBarType={MessageBarType.warning}>You requested a high security cluster. The DNS and Certificate options are disabled as they require additional egress application firewall rules for image download and webhook requirements. You can apply these rules and install the helm chart after provisioning</MessageBar>
           }
           <Checkbox disabled={cluster.securityLevel !== "normal"} checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
@@ -912,6 +974,7 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
           Do you require a secure private container registry to store my application images
         </Label>
         <ChoiceGroup
+          styles={{ root: { marginLeft: '50px' } }}
           selectedKey={addons.registry}
           options={[
             { key: 'none', text: 'No, my application images will be on dockerhub or another registry' },
