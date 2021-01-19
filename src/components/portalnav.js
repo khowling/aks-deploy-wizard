@@ -410,9 +410,9 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
     (cluster.vmSize !== 'default' ? `   agentVMSize=${cluster.vmSize} \\\n` : '') +
     `   agentCount=${cluster.count} \\\n` +
     (cluster.autoscale ? `   agentCountMax=${cluster.maxCount} \\\n` : '') +
-    (cluster.osDiskType === 'Managed' ? `   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB={$cluster.osDiskSizeGB}` : '')} \\\n` : '') +
+    (cluster.osDiskType === 'Managed' ? `   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB=${cluster.osDiskSizeGB}` : '')} \\\n` : '') +
     (net.custom_vnet ? '   custom_vnet=true \\\n' : '') +
-    (cluster.enable_aad ? `   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id={$cluster.aad_tenant_id}` : '')} \\\n` : '') +
+    (cluster.enable_aad ? `   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id=${cluster.aad_tenant_id}` : '')} \\\n` : '') +
     (addons.registry !== 'none' ? `   registries_sku=${addons.registry} \\\n` : '') +
     (net.afw ? `   azureFirewalls=true \\\n` : '') +
     (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? `   serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}" \\\n` : '') +
@@ -434,7 +434,7 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
       (cluster.apisecurity !== 'none' ? ` apisecurity = ${ cluster.apisecurity } `:'') 
   */
   const preview_features =
-    (cluster.enable_aad && cluster.enableAzureRBAC ? '   enableAzureRBAC=true \\\n' : '') +
+    (cluster.enable_aad && cluster.enableAzureRBAC ? `   enableAzureRBAC=true ${(cluster.adminprincipleid ? `adminprincipleid=${cluster.adminprincipleid}` : '')} \\\n` : '') +
     (cluster.upgradeChannel !== 'none' ? `   upgradeChannel=${cluster.upgradeChannel} \\\n` : '') +
     (addons.gitops !== 'none' ? `   gitops=${addons.gitops} \\\n` : '') +
     (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? `   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'} \\\n` : '') +
