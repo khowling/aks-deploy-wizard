@@ -403,7 +403,7 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
     }
   */
   const apiips_array = deploy.apiips.split(',').filter(x => x.trim())
-  const armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \\\n` +
+  const armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \n` +
     `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters \\\n` +
     `   kubernetesVersion=${process.env.REACT_APP_K8S_VERSION} \\\n` +
     `   resourceName=${deploy.clusterName} \\\n` +
