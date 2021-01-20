@@ -14,7 +14,7 @@ const optionRootClass = mergeStyles({
   alignItems: 'baseline'
 });
 
-const adv_stackstyle = { root: { border: "1px solid", background: "#fcfcfc", margin: "10px 0", padding: "15px", height: "1300px" } }
+const adv_stackstyle = { root: { border: "1px solid", background: "#fcfcfc", margin: "10px 0", padding: "15px", height: "2000px" } }
 
 const iconClass = mergeStyles({
   fontSize: 80,
@@ -86,9 +86,8 @@ export default function PortalNav() {
     certMan: false,
     certEmail: "",
     dns: false,
-    dnsZone: "",
+    dnsZoneId: "",
     registry: 'none',
-    keyvaultcsi: false,
     podid: false,
     podscale: false,
     monitor: "none",
@@ -111,8 +110,11 @@ export default function PortalNav() {
     podCidr: "10.244.0.0/16",
     service: "10.0.0.0/16"
   })
+  const [app, setApp] = useState({
+    keyvaultcsi: false
+  })
   const [deploy, setDeploy] = useState({
-    clusterName: "",
+    clusterName: `az-k8s-${(Math.floor(Math.random() * 900000) + 100000).toString(36)}`,
     location: "WestEurope",
     apiips: '',
     demoapp: false,
@@ -172,6 +174,8 @@ export default function PortalNav() {
   //invalidFn('net', 'serviceEndpoints', net.serviceEndpointsEnable && net.serviceEndpoints.size === 0)
   invalidFn('addons', 'registry', (net.vnetprivateend || net.serviceEndpointsEnable) && (addons.registry !== 'Premium' && addons.registry !== 'none'))
   invalidFn('deploy', 'apiips', cluster.apisecurity === 'whitelist' && deploy.apiips.length < 7)
+  invalidFn('addons', 'dnsZoneId', addons.dns && !addons.dnsZoneId.match('^/subscriptions/[^/ ]+/resourceGroups/[^/ ]+/providers/Microsoft.Network/dnszones/[^/ ]+$'))
+  invalidFn('addons', 'certEmail', addons.certMan && !addons.certEmail.match('^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'))
 
   function _customRenderer(page, link, defaultRenderer) {
     return (
@@ -376,7 +380,7 @@ export default function PortalNav() {
               <ClusterScreen cluster={cluster} updateFn={(key, val) => mergeState(setCluster, cluster, key, val)} invalidArray={invalidArray['cluster']} />
             </PivotItem>
             <PivotItem headerText={navScreenHeader[1]} itemKey="2" onRenderItemLink={(a, b) => _customRenderer('addons', a, b)} >
-              <AddonsScreen cluster={cluster} addons={addons} updateFn={(key, val) => mergeState(setAddons, addons, key, val)} invalidArray={invalidArray['addons']} />
+              <AddonsScreen cluster={cluster} addons={addons} net={net} updateFn={(key, val) => mergeState(setAddons, addons, key, val)} invalidArray={invalidArray['addons']} />
             </PivotItem>
             <PivotItem headerText={navScreenHeader[2]} itemKey="3" onRenderItemLink={(a, b) => _customRenderer('net', a, b)}>
               <NetworkScreen net={net} addons={addons} cluster={cluster} updateFn={(key, val) => mergeState(setNet, net, key, val)} invalidArray={invalidArray['net']} />
@@ -404,56 +408,84 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
   */
   const apiips_array = deploy.apiips.split(',').filter(x => x.trim())
   const armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \n` +
-    `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters \\\n` +
-    `   kubernetesVersion=${process.env.REACT_APP_K8S_VERSION} \\\n` +
-    `   resourceName=${deploy.clusterName} \\\n` +
-    (cluster.vmSize !== 'default' ? `   agentVMSize=${cluster.vmSize} \\\n` : '') +
-    `   agentCount=${cluster.count} \\\n` +
-    (cluster.autoscale ? `   agentCountMax=${cluster.maxCount} \\\n` : '') +
-    (cluster.osDiskType === 'Managed' ? `   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB=${cluster.osDiskSizeGB}` : '')} \\\n` : '') +
-    (net.custom_vnet ? '   custom_vnet=true \\\n' : '') +
-    (cluster.enable_aad ? `   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id=${cluster.aad_tenant_id}` : '')} \\\n` : '') +
-    (addons.registry !== 'none' ? `   registries_sku=${addons.registry} \\\n` : '') +
-    (net.afw ? `   azureFirewalls=true \\\n` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? `   serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}" \\\n` : '') +
-    (addons.monitor === 'aci' ? `   omsagent=true retentionInDays=${addons.retentionInDays} \\\n` : "") +
-    (addons.networkPolicy !== 'none' ? `   networkPolicy=${addons.networkPolicy} \\\n` : '') +
-    (addons.azurepolicy !== 'none' ? `   azurepolicy=${addons.azurepolicy} \\\n` : '') +
-    (net.networkPlugin !== 'azure' ? `   networkPlugin=${net.networkPlugin} \\\n` : '') +
-    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? `   authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}" \\\n` : '') +
-    (cluster.apisecurity === 'private' ? `   enablePrivateCluster=true \\\n` : '')
+    `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` +
+    ` \\\n   resourceName=${deploy.clusterName}` +
+    ` \\\n   kubernetesVersion=${process.env.REACT_APP_K8S_VERSION}` +
+    ` \\\n   agentCount=${cluster.count}` +
+    (cluster.vmSize !== 'default' ? ` \\\n   agentVMSize=${cluster.vmSize}` : '') +
+    (cluster.autoscale ? ` \\\n   agentCountMax=${cluster.maxCount}` : '') +
+    (cluster.osDiskType === 'Managed' ? ` \\\n   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB=${cluster.osDiskSizeGB}` : '')}` : '') +
+    (net.custom_vnet ? ' \\\n   custom_vnet=true' : '') +
+    (cluster.enable_aad ? ` \\\n   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id=${cluster.aad_tenant_id}` : '')}` : '') +
+    (addons.registry !== 'none' ? ` \\\n   registries_sku=${addons.registry}` : '') +
+    (net.afw ? ` \\\n   azureFirewalls=true` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? ` \\\n   serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}"` : '') +
+    (addons.monitor === 'aci' ? ` \\\n   omsagent=true retentionInDays=${addons.retentionInDays}` : "") +
+    (addons.networkPolicy !== 'none' ? ` \\\n   networkPolicy=${addons.networkPolicy}` : '') +
+    (addons.azurepolicy !== 'none' ? ` \\\n   azurepolicy=${addons.azurepolicy}` : '') +
+    (net.networkPlugin !== 'azure' ? ` \\\n   networkPlugin=${net.networkPlugin}` : '') +
+    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? ` \\\n   authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
+    (cluster.apisecurity === 'private' ? ` \\\n   enablePrivateCluster=true` : '') +
+    (addons.dns && addons.dnsZoneId ? ` \\\n   dnsZoneId=${addons.dnsZoneId}` : '')
 
-
-  /*
-    let features = 
-      (addons.podscale ? " -a podscale " : "") + 
-      (addons.podid ? "-a podid " : "") + 
-      (addons.keyvaultcsi ? "-a keyvaultcsi " : "") + 
-      (addons.reboot ? ' -a kured ':'') + 
-      (cluster.autoscale ? ` - a clustrautoscaler = ${ cluster.maxCount } `:'') + 
-      (cluster.apisecurity !== 'none' ? ` apisecurity = ${ cluster.apisecurity } `:'') 
-  */
   const preview_features =
-    (cluster.enable_aad && cluster.enableAzureRBAC ? `   enableAzureRBAC=true ${(cluster.adminprincipleid ? `adminprincipleid=${cluster.adminprincipleid}` : '')} \\\n` : '') +
-    (cluster.upgradeChannel !== 'none' ? `   upgradeChannel=${cluster.upgradeChannel} \\\n` : '') +
-    (addons.gitops !== 'none' ? `   gitops=${addons.gitops} \\\n` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? `   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'} \\\n` : '') +
-    (addons.ingress === 'appgw' ? `   ingressApplicationGateway=true \\\n` : '')
+    (cluster.enable_aad && cluster.enableAzureRBAC ? ` \\\n   enableAzureRBAC=true ${(cluster.adminprincipleid ? `adminprincipleid=${cluster.adminprincipleid}` : '')}` : '') +
+    (cluster.upgradeChannel !== 'none' ? ` \\\n   upgradeChannel=${cluster.upgradeChannel}` : '') +
+    (addons.gitops !== 'none' ? ` \\\n   gitops=${addons.gitops}` : '') +
+    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` \\\n   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '') +
+    (addons.ingress === 'appgw' ? ` \\\n   ingressApplicationGateway=true` : '')
+
+  const deploycmd = armcmd + (deploy.disablePreviews ? '' : preview_features)
 
 
-  const getcreds = `az aks get-credentials - g ${deploy.clusterName} -rg - n ${deploy.clusterName} --admin \\\n` +
-    '#  TO BE COMPLETED'
+  const postscript = `# Get admin credentials for your new AKS cluster
+az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --admin ` +
+    (addons.ingress === 'nginx' ? `\n\n# Create a namespace for your ingress resources
+kubectl create namespace ingress-basic
 
-  //? 'az feature register --name AKS-IngressApplicationGatewayAddon --namespace Microsoft.ContainerService' : '') +
-  //(` - a ${ addons.ingress } ` + (addons.dns && cluster.securityLevel === "normal" ? ` - a dns = ${ addons.dnsZone.split("/")[4] + "/" + addons.dnsZone.split("/")[8] } ` : "") + (addons.certMan && cluster.securityLevel === "normal" ? ` - a cert = ${ addons.certEmail } ` : "")) : "") + 
-  //(cluster.securityLevel === "high" ? " -a private-api -a podsec " : "")
+# Add the ingress-nginx repository
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
+# Use Helm to deploy an NGINX ingress controller
+helm install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true --namespace ingress-basic` : '') +
+    (addons.dnsZoneId ? `\n\n# Install external-dns
+kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdin<<EOF
+{
+  "userAssignedIdentityID": "$(az aks show -g az-k8s-7vqg-rg -n az-k8s-7vqg --query identityProfile.kubeletidentity.clientId -o tsv)",
+  "tenantId": "$(az account show --query tenantId -o tsv)",
+  "useManagedIdentityExtension": true,
+  "subscriptionId": "${addons.dnsZoneId.split('/')[2]}",
+  "resourceGroup": "${addons.dnsZoneId.split('/')[4]}"
+}
+EOF
 
-  //let deploy_str = `wget - qO - https://github.com/khowling/aks-deploy-arm/tarball/${deploy_version} | \\
-  //  tar xzf - && ( cd khowling-aks-deploy-arm-*; chmod +x ./deploy.sh; \\
-  //  ./deploy.sh -l ${deploy.location} ${cluster.networkPlugin ? " -n networkPlugin " : ""} -c ${cluster.count} ${cluster.vmSize !== 'default' ? "-v " + cluster.vmSize : ""} ${cluster.osDiskSizeGB > 0 ? "-o " + cluster.osDiskSizeGB : ""} ${deploy.demoapp ? "-d" : ""} ${aad_cmd}  \\
-  //  ${features} ${deploy.disablePreviews ? "" : preview_features} \\
-  //  ${deploy.clusterName} )`
+kubectl apply -f https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/cluster-config/external-dns.yml` : '') +
+    (addons.certEmail ? `\n\n# Install cert-manager
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
+
+sleep 30s
+
+cat <<EOF | kubectl create -f -
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # The ACME server URL
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Email address used for ACME registration
+    email: "${addons.certEmail}"
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: $ingress_class
+EOF
+` : '')
 
   return (
 
@@ -521,7 +553,7 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
         </MessageBar>
 
     */}
-      <TextField readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={16} value={`${armcmd}${deploy.disablePreviews ? '' : preview_features}`} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
+      <TextField readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={deploycmd.split(/\r\n|\r|\n/).length + 1} value={deploycmd} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
       <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
 
       <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Next Steps</b></Separator>
@@ -530,7 +562,7 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
         <Stack>
           <Label>Run these commands to install the requeted kubernetes packages into your cluster</Label>
           <MessageBar>Once available, we will switch to using the gitops addon here, to assure that your clusters get their source of truth from the defined git repo</MessageBar>
-          <TextField readOnly={true} label="Commands (requires helm)" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`${getcreds}`} />
+          <TextField readOnly={true} label="Commands (requires helm)" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={postscript.split(/\r\n|\r|\n/).length + 1} value={postscript} />
         </Stack>
         :
         <Stack>
@@ -813,7 +845,7 @@ const columnProps = {
   styles: { root: { width: 300 } }
 }
 
-function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
+function AddonsScreen({ cluster, addons, net, updateFn, invalidArray }) {
 
   return (
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
@@ -923,47 +955,23 @@ function AddonsScreen({ cluster, addons, updateFn, invalidArray }) {
           {addons.ingress !== "none" && false &&
             <MessageBar messageBarType={MessageBarType.warning}>You requested a high security cluster. The DNS and Certificate options are disabled as they require additional egress application firewall rules for image download and webhook requirements. You can apply these rules and install the helm chart after provisioning</MessageBar>
           }
-          <Checkbox disabled={cluster.securityLevel !== "normal"} checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
-          {((show) => {
-            //  styles={{ root: {display: (addons.dns ? "block" :  "none" )}}}
-            if (show) {
-              let invalid = true
-              if (addons.dnsZone && addons.dnsZone.length > 100) {
-                let resid_array = addons.dnsZone.split("/")
-                if (!(resid_array.length !== 9 || resid_array[1] !== "subscriptions" || resid_array[3] !== "resourceGroups" || resid_array[7] !== "dnszones" || resid_array[8].indexOf(".") <= 0)) {
-                  invalid = false
-                }
+
+          {addons.ingress === "nginx" &&
+            <>
+              <Checkbox disabled={net.afw} checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications using external-dns (Beta) (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
+              {addons.dns &&
+                <>
+                  <TextField disabled={net.afw} value={addons.dnsZoneId} onChange={(ev, v) => updateFn("dnsZoneId", v)} errorMessage={invalidArray.includes('dnsZoneId') ? "Enter valid resourceId" : ""} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
+
+
+                  <Checkbox disabled={invalidArray.includes('dnsZoneId')} checked={addons.certMan} onChange={(ev, v) => updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email" />
+                  {addons.certMan &&
+                    <TextField value={addons.certEmail} onChange={(ev, v) => updateFn("certEmail", v)} errorMessage={invalidArray.includes('certEmail') ? "Enter valid email" : ''} label="Enter mail address for certificate notification:" required />
+                  }
+                </>
               }
-              //invalidFn("certMan", invalid)
-              return (
-                <TextField disabled={cluster.securityLevel !== "normal"} value={addons.dnsZone} onChange={(ev, v) => updateFn("dnsZone", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} underlined required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
-              )
-            } else {
-              //invalidFn("certMan", false)
-            }
-          })(addons.dns && addons.ingress !== 'none')}
-
-          <Checkbox disabled={true} checked={addons.certMan} onChange={(ev, v) => updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS (cert-manager with Lets Encrypt - requires email" />
-          {((show) => {
-            //  styles={{ root: {display: (addons.dns ? "block" :  "none" )}}}
-            if (show) {
-              let invalid = true
-              if (addons.certEmail && addons.certEmail.length > 4) {
-                let e_array = addons.certEmail.split("@")
-                if (!(e_array.length !== 2 || e_array[1] === "example.com" || e_array[1].indexOf(".") <= 0)) {
-                  invalid = false
-                }
-              }
-              //invalidFn("certEmail", invalid)
-              return (
-                <TextField disabled={cluster.securityLevel !== "normal"} value={addons.certEmail} onChange={(ev, v) => updateFn("certEmail", v)} errorMessage={invalid ? "Enter valid resourceId" : ""} label="Enter mail address for certificate notification:" underlined required placeholder="email@address.com" />
-              )
-            } else {
-              //invalidFn("certEmail", false)
-            }
-          })(addons.certMan && addons.ingress !== 'none')}
-
-
+            </>
+          }
         </Stack>
       </Stack.Item>
 
@@ -1156,7 +1164,7 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
           <MessageBar messageBarType={MessageBarType.warning}>Custom Networking - Advanced Setup</MessageBar>
           <div style={{ padding: "10px", maxWidth: "500px" }}>
             <Text >
-              Select this option if you need to connect your AKS network with another networks, either through VNET peering or a Expressroute or VPN Gateway.  You will need to complete the <Text style={{ fontWeight: "bold" }} >"Advanced Connectivity"</Text> tab in this wizard
+              Select this option if you need to connect your AKS network with another networks, either through VNET peering or a Expressroute or VPN Gateway.
               </Text>
           </div>
         </Callout>
@@ -1165,32 +1173,34 @@ function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
       {net.custom_vnet &&
 
         <Stack styles={adv_stackstyle}>
-          <Label>Custom Network configration</Label>
+          <Label>Custom Network VENT & Kubernetes Network Configration</Label>
           <Stack horizontal tokens={{ childrenGap: 50 }} styles={{ root: { width: 650 } }}>
             <Stack {...columnProps}>
-              <Label>AKS Virtual Network & Subnet CIDRs</Label>
+
               <Stack.Item align="start">
-                <TextField prefix="Cidr" onChange={(ev, val) => updateFn("vnet", val)} value={net.vnet} />
+                <TextField prefix="Cidr" label="VNET Address space" onChange={(ev, val) => updateFn("vnet", val)} value={net.vnet} />
               </Stack.Item>
               <Stack.Item align="center">
-                <TextField prefix="Cidr" label="AKS Nodes" onChange={(ev, val) => updateFn("akssub", val)} value={net.akssub} />
+                <TextField prefix="Cidr" label="AKS Nodes subnet" onChange={(ev, val) => updateFn("akssub", val)} value={net.akssub} />
               </Stack.Item>
+              {/*
               <Stack.Item align="center">
-                <TextField prefix="Cidr" label="LoadBalancer Services" onChange={(ev, val) => updateFn("ilbsub", val)} value={net.ilbsub} />
+                <TextField prefix="Cidr" label="LoadBalancer Services subnet" onChange={(ev, val) => updateFn("ilbsub", val)} value={net.ilbsub} />
               </Stack.Item>
+              */}
               <Stack.Item align="center">
-                <TextField prefix="Cidr" disabled={!net.afw} label="Azure Firewall" onChange={(ev, val) => updateFn("afwsub", val)} value={cluster.securityLevel !== 'normal' ? net.afwsub : "N/A"} />
+                <TextField prefix="Cidr" disabled={!net.afw} label="Azure Firewall subnet" onChange={(ev, val) => updateFn("afwsub", val)} value={net.afw ? net.afwsub : "No Firewall requested"} />
               </Stack.Item>
 
               <Stack.Item align="center">
-                <TextField prefix="Cidr" disabled={addons.ingress !== 'appgw'} label="Application Gateway" onChange={(ev, val) => updateFn("agsub", val)} value={addons.ingress === 'appgw' ? net.agsub : "N/A"} />
+                <TextField prefix="Cidr" disabled={addons.ingress !== 'appgw'} label="Application Gateway subnet" onChange={(ev, val) => updateFn("agsub", val)} value={addons.ingress === 'appgw' ? net.agsub : "N/A"} />
               </Stack.Item>
             </Stack>
 
             <Stack {...columnProps}>
-              <Label>Kubernetes Networking CIDRs</Label>
+              <Label>Kubernetes Networking Configuration</Label>
               <Stack.Item align="start">
-                <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin === 'kubenet' ? net.podCidr : "<POD IPs from subnet>"} />
+                <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin === 'kubenet' ? net.podCidr : "IPs from subnet"} />
               </Stack.Item>
               <Stack.Item align="start">
                 <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
