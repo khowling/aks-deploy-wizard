@@ -451,7 +451,7 @@ helm install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishS
     (addons.dnsZoneId ? `\n\n# Install external-dns
 kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdin<<EOF
 {
-  "userAssignedIdentityID": "$(az aks show -g az-k8s-7vqg-rg -n az-k8s-7vqg --query identityProfile.kubeletidentity.clientId -o tsv)",
+  "userAssignedIdentityID": "$(az aks show -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --query identityProfile.kubeletidentity.clientId -o tsv)",
   "tenantId": "$(az account show --query tenantId -o tsv)",
   "useManagedIdentityExtension": true,
   "subscriptionId": "${addons.dnsZoneId.split('/')[2]}",
@@ -483,7 +483,7 @@ spec:
     solvers:
     - http01:
         ingress:
-          class: $ingress_class
+          class: ${(addons.ingress === 'nginx' ? "nginx" : "azure/application-gateway")}
 EOF
 ` : '')
 
