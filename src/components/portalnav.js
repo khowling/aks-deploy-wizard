@@ -111,9 +111,9 @@ export default function PortalNav() {
     podCidr: "10.244.0.0/16",
     service: "10.0.0.0/16"
   })
-  const [app, setApp] = useState({
-    keyvaultcsi: false
-  })
+  //const [app, setApp] = useState({
+  //  keyvaultcsi: false
+  //})
   const [deploy, setDeploy] = useState({
     clusterName: `az-k8s-${(Math.floor(Math.random() * 900000) + 100000).toString(36)}`,
     location: "WestEurope",
@@ -132,8 +132,7 @@ export default function PortalNav() {
     }).then((res) => {
       setDeploy((prev) => { return { ...prev, apiips: res.ip } })
     }).catch((err) => console.error('Problem fetching my IP', err))
-
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function setOperationsManaged() {
@@ -176,7 +175,7 @@ export default function PortalNav() {
   invalidFn('addons', 'registry', (net.vnetprivateend || net.serviceEndpointsEnable) && (addons.registry !== 'Premium' && addons.registry !== 'none'))
   invalidFn('deploy', 'apiips', cluster.apisecurity === 'whitelist' && deploy.apiips.length < 7)
   invalidFn('addons', 'dnsZoneId', addons.dns && !addons.dnsZoneId.match('^/subscriptions/[^/ ]+/resourceGroups/[^/ ]+/providers/Microsoft.Network/dnszones/[^/ ]+$'))
-  invalidFn('addons', 'certEmail', addons.certMan && !addons.certEmail.match('^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'))
+  invalidFn('addons', 'certEmail', addons.certMan && !addons.certEmail.match('^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$'))
 
   function _customRenderer(page, link, defaultRenderer) {
     return (
@@ -1039,6 +1038,7 @@ function AddonsScreen({ cluster, addons, net, updateFn, invalidArray }) {
   )
 }
 
+/*
 function ApplicationScreen({ cluster, addons, updateFn, invalidArray }) {
 
   return (
@@ -1057,7 +1057,7 @@ function ApplicationScreen({ cluster, addons, updateFn, invalidArray }) {
     </Stack>
   )
 }
-
+*/
 
 
 function NetworkScreen({ net, updateFn, addons, cluster, invalidArray }) {
