@@ -1,26 +1,22 @@
 name: Node CI
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [8.x, 10.x, 12.x]
-
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: npm install, build, and test
-      run: |
-        npm ci
-        npm run build --if-present
-        npm test
-      env:
-        CI: true
+      - uses: actions/checkout@v2.3.1
+      - name: Install and Build
+        run: |
+          npm install
+          REACT_APP_APPINSIGHTS_KEY="xxx" REACT_APP_K8S_VERSION="1.19.7" REACT_APP_AZ_TEMPLATE_ARG="--template-uri https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/build/main.json" npm run build
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build

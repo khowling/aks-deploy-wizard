@@ -16,7 +16,9 @@ import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 export const appInsights = new ApplicationInsights({
   config: { instrumentationKey: process.env.REACT_APP_APPINSIGHTS_KEY }
 });
-appInsights.loadAppInsights();
+if (process.env.REACT_APP_APPINSIGHTS_KEY) {
+  appInsights.loadAppInsights();
+}
 
 initializeIcons();
 

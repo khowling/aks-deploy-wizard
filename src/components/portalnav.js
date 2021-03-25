@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Fabric, mergeStyles, FontIcon, Pivot, PivotItem, TextField, Icon, Link, Separator, DropdownMenuItemType, Dropdown, Slider, DirectionalHint, Callout, Stack, Text, Toggle, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
+import { Fabric, mergeStyles, Image, FontIcon, Pivot, PivotItem, TextField, Icon, Link, Separator, DropdownMenuItemType, Dropdown, Slider, DirectionalHint, Callout, Stack, Text, Toggle, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
 
 import { Card } from '@uifabric/react-cards'
 import { appInsights } from '../index.js'
@@ -77,7 +77,8 @@ export default function PortalNav() {
     aad_tenant_id: "",
     enableAzureRBAC: true,
     adminprincipleid: '',
-    aadgroupids: ''
+    aadgroupids: '',
+    availabilityZones: 'no'
   })
   const [addons, setAddons] = useState({
     networkPolicy: 'none',
@@ -424,21 +425,25 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
     (addons.networkPolicy !== 'none' ? ` \\\n   networkPolicy=${addons.networkPolicy}` : '') +
     (addons.azurepolicy !== 'none' ? ` \\\n   azurepolicy=${addons.azurepolicy}` : '') +
     (net.networkPlugin !== 'azure' ? ` \\\n   networkPlugin=${net.networkPlugin}` : '') +
+    (cluster.availabilityZones === 'yes' ? ` \\\n   availabilityZones="${JSON.stringify(['1', '2', '3']).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
     (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? ` \\\n   authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
     (cluster.apisecurity === 'private' ? ` \\\n   enablePrivateCluster=true` : '') +
-    (addons.dns && addons.dnsZoneId ? ` \\\n   dnsZoneId=${addons.dnsZoneId}` : '')
+    (addons.dns && addons.dnsZoneId ? ` \\\n   dnsZoneId=${addons.dnsZoneId}` : '') +
+    (addons.ingress === 'appgw' ? ` \\\n   ingressApplicationGateway=true` : '')
 
   const preview_features =
     (cluster.enable_aad && cluster.enableAzureRBAC ? ` \\\n   enableAzureRBAC=true ${(cluster.adminprincipleid ? `adminprincipleid=${cluster.adminprincipleid}` : '')}` : '') +
     (cluster.upgradeChannel !== 'none' ? ` \\\n   upgradeChannel=${cluster.upgradeChannel}` : '') +
     (addons.gitops !== 'none' ? ` \\\n   gitops=${addons.gitops}` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` \\\n   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '') +
-    (addons.ingress === 'appgw' ? ` \\\n   ingressApplicationGateway=true` : '')
+    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` \\\n   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '')
 
   const deploycmd = armcmd + (deploy.disablePreviews ? '' : preview_features)
 
-
-  const postscript = `# Get admin credentials for your new AKS cluster
+  const postscript_woraround = `# Workaround to enabling the appgw addon with custom vnet
+az aks enable-addons -n ${deploy.clusterName} -g ${deploy.clusterName}-rg -a ingress-appgw --appgw-id $(az network application-gateway show -g ${deploy.clusterName}-rg -n ${deploy.clusterName}-appgw --query id -o tsv)
+`
+  const postscript = ((net.custom_vnet || net.afw || (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0)) ? postscript_woraround : '') +
+    `# Get admin credentials for your new AKS cluster
 az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --admin ` +
     (addons.ingress === 'nginx' ? `\n\n# Create a namespace for your ingress resources
 kubectl create namespace ingress-basic
@@ -466,7 +471,7 @@ kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1
 sleep 30s
 
 cat <<EOF | kubectl create -f -
-apiVersion: cert-manager.io/v1alpha2
+apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-prod
@@ -538,7 +543,7 @@ EOF
           checked={deploy.demoapp} onText="Yes" offText="No" onChange={(ev, checked) => updateFn("demoapp", checked)} />
       */}
 
-      <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Deploy Cluster</b></Separator>
+      <Separator styles={{ root: { marginTop: '30px !important' } }}><div style={{ display: "flex", alignItems: 'center', }}><b style={{ marginRight: '10px' }}>Deploy Cluster</b><Image src="./bicep.png" /> <p style={{ marginLeft: '10px' }}>powered by Bicep</p></div> </Separator>
 
       { preview_features.length > 0 &&
         <MessageBar messageBarType={MessageBarType.warning}>
@@ -554,6 +559,7 @@ EOF
 
     */}
       <TextField readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={deploycmd.split(/\r\n|\r|\n/).length + 1} value={deploycmd} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
+
       <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
 
       <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Next Steps</b></Separator>
@@ -588,15 +594,17 @@ EOF
 }
 
 const VMs = [
+  { key: 'b', text: 'Burstable (dev/test)', itemType: DropdownMenuItemType.Header },
+  { key: 'Standard_B2s', text: '2 vCPU,  4 GiB RAM,   8GiB SSD, 40%	-> 200% CPU', eph: true },
   { key: 'dv2', text: 'General purpose V2', itemType: DropdownMenuItemType.Header },
-  { key: 'default', text: '(Standard_DS2_v2) 2 vCPU,  7 GiB RAM, 14GiB SSD,  86 GiB cache (8000 IOPS)', eph: false },
-  { key: 'Standard_DS3_v2', text: '(Standard_DS3_v2) 4 vCPU, 14 GiB RAM, 28GiB SSD, 172 GiB cache (16000 IOPS)', eph: true },
+  { key: 'default', text: '2 vCPU,  7 GiB RAM,  14GiB SSD,  86 GiB cache (8000 IOPS)', eph: false },
+  { key: 'Standard_DS3_v2', text: '4 vCPU, 14 GiB RAM,  28GiB SSD, 172 GiB cache (16000 IOPS)', eph: true },
   { key: 'dv4', text: 'General purpose V4', itemType: DropdownMenuItemType.Header },
-  { key: 'Standard_D2ds_v4', text: '2 vCPU,  8 GiB RAM, 75GiB  SSD (19000 IOPS)', eph: false },
-  { key: 'Standard_D4ds_v4', text: '4 vCPU, 16 GiB RAM, 150GiB SSD, 100 GiB cache  (38500 IOPS)', eph: false },
-  { key: 'Standard_D8ds_v4', text: '8 vCPU, 32 GiB RAM, 300GiB SSD (77000 IOPS)', eph: true },
+  { key: 'Standard_D2ds_v4', text: '2 vCPU,  8 GiB RAM,  75GiB SSD,               (19000 IOPS)', eph: false },
+  { key: 'Standard_D4ds_v4', text: '4 vCPU, 16 GiB RAM, 150GiB SSD, 100 GiB cache (38500 IOPS)', eph: false },
+  { key: 'Standard_D8ds_v4', text: '8 vCPU, 32 GiB RAM, 300GiB SSD,               (77000 IOPS)', eph: true },
   { key: 'fv2', text: 'Compute optimized', itemType: DropdownMenuItemType.Header },
-  { key: 'Standard_F2s_v2', text: '2 vCPU, 4 GiB RAM, 16 GiB SSD (3200 IOPS)', eph: false }
+  { key: 'Standard_F2s_v2', text: '2 vCPU,  4 GiB RAM,  16GiB SSD,               (3200 IOPS)', eph: false }
 ]
 
 function ClusterScreen({ cluster, updateFn, invalidArray }) {
@@ -711,6 +719,24 @@ function ClusterScreen({ cluster, updateFn, invalidArray }) {
           </Stack.Item>
         </Stack>
       </Stack>
+
+      <Separator className="notopmargin" />
+
+      <Stack.Item align="start">
+        <Label required={true}>Zone Support - Do you want to deploy your nodes across Availability Zones
+          </Label>
+        <ChoiceGroup
+          selectedKey={cluster.availabilityZones}
+          styles={{ root: { marginLeft: '50px' } }}
+          options={[
+            { key: 'no', text: 'Deploy into single zone' },
+            { key: 'yes', text: 'Deploy my control plane and nodes across all availiability zones (**storage)' }
+
+          ]}
+          onChange={(ev, { key }) => updateFn("availabilityZones", key)}
+        // styles={{ label: {fontWeight: "regular"}}}
+        />
+      </Stack.Item>
 
       <Separator className="notopmargin" />
 
