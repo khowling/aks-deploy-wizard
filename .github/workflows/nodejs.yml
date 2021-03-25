@@ -9,14 +9,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v2
       - name: Install and Build
         run: |
           npm install
           REACT_APP_APPINSIGHTS_KEY="xxx" REACT_APP_K8S_VERSION="1.19.7" REACT_APP_AZ_TEMPLATE_ARG="--template-uri https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/build/main.json" npm run build
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy to GitHub Pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          target_branch: gh-pages
+          build_dir: public
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
