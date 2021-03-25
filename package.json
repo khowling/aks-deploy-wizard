@@ -2,6 +2,7 @@
   "name": "aks-deploy-guide2",
   "version": "0.1.0",
   "private": true,
+  "homepage": "/aks-deploy-wizard/",
   "dependencies": {
     "office-ui-fabric-react": "^7.155.3",
     "react": "^16.14.0",
