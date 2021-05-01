@@ -451,7 +451,12 @@ kubectl create namespace ingress-basic
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
 # Use Helm to deploy an NGINX ingress controller
-helm install nginx-ingress ingress-nginx/ingress-nginx --set controller.publishService.enabled=true --namespace ingress-basic` : '') +
+helm install nginx-ingress ingress-nginx/ingress-nginx \\
+  --set controller.kind=DaemonSet \\
+  --set controller.publishService.enabled=true \\
+  --set controller.metrics.enabled=true \\
+  --set controller.metrics.serviceMonitor.enabled=true \\
+  --namespace ingress-basic` : '') +
     (addons.dnsZoneId ? `\n\n# Install external-dns
 kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdin<<EOF
 {
