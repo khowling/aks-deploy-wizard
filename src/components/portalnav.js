@@ -444,6 +444,13 @@ az aks enable-addons -n ${deploy.clusterName} -g ${deploy.clusterName}-rg -a ing
   const postscript = ((net.custom_vnet || net.afw || (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0)) ? postscript_woraround : '') +
     `# Get admin credentials for your new AKS cluster
 az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --admin ` +
+
+    (addons.monitor === 'oss' ? `\n\n# Install kube-prometheus-stack
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+kubectl create namespace monitoring
+helm install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring` : '') +
+
     (addons.ingress === 'nginx' ? `\n\n# Create a namespace for your ingress resources
 kubectl create namespace ingress-basic
 
@@ -454,9 +461,12 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm install nginx-ingress ingress-nginx/ingress-nginx \\
   --set controller.kind=DaemonSet \\
   --set controller.publishService.enabled=true \\
-  --set controller.metrics.enabled=true \\
+` + (addons.monitor === 'oss' ?
+        `  --set controller.metrics.enabled=true \\
   --set controller.metrics.serviceMonitor.enabled=true \\
-  --namespace ingress-basic` : '') +
+` : '') +
+      `  --namespace ingress-basic` : '') +
+
     (addons.dnsZoneId ? `\n\n# Install external-dns
 kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdin<<EOF
 {
@@ -469,6 +479,7 @@ kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdi
 EOF
 
 curl https://raw.githubusercontent.com/khowling/aks-deploy-arm/master/cluster-config/external-dns.yml | sed '/- --provider=azure/a\\            - --domain-filter=${addons.dnsZoneId.split('/')[8]}' | kubectl apply -f -` : '') +
+
     (addons.certEmail ? `\n\n# Install cert-manager
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml
 
