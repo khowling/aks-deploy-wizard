@@ -468,6 +468,7 @@ helm install nginx-ingress ingress-nginx/ingress-nginx \\
       (addons.monitor === 'oss' ?
         `  --set controller.metrics.enabled=true \\
   --set controller.metrics.serviceMonitor.enabled=true \\
+  --set controller.metrics.serviceMonitor.namespace=monitoring \\
 ` : '') +
       `  --namespace ingress-basic` : '') +
 
