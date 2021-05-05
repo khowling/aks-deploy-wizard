@@ -442,6 +442,11 @@ function DeployScreen({ updateFn, net, addons, cluster, deploy, invalidArray, al
   const postscript_woraround = `# Workaround to enabling the appgw addon with custom vnet
 az aks enable-addons -n ${deploy.clusterName} -g ${deploy.clusterName}-rg -a ingress-appgw --appgw-id $(az network application-gateway show -g ${deploy.clusterName}-rg -n ${deploy.clusterName}-appgw --query id -o tsv)
 `
+  const promethous_namespace = 'monitoring'
+  const promethous_helm_release_name = 'monitoring'
+  const nginx_namespace = 'ingress-basic'
+  const nginx_helm_release_name = 'nginx-ingress'
+
   const postscript = ((net.custom_vnet || net.afw || (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0)) ? postscript_woraround : '') +
     `# Get admin credentials for your new AKS cluster
 az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --admin ` +
@@ -449,17 +454,17 @@ az aks get-credentials -g ${deploy.clusterName}-rg -n ${deploy.clusterName} --ad
     (addons.monitor === 'oss' ? `\n\n# Install kube-prometheus-stack
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-kubectl create namespace monitoring
-helm install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring` : '') +
+kubectl create namespace ${promethous_namespace}
+helm install ${promethous_helm_release_name} prometheus-community/kube-prometheus-stack --namespace ${promethous_namespace}` : '') +
 
     (addons.ingress === 'nginx' ? `\n\n# Create a namespace for your ingress resources
-kubectl create namespace ingress-basic
+kubectl create namespace ${nginx_namespace}
 
 # Add the ingress-nginx repository
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
 # Use Helm to deploy an NGINX ingress controller
-helm install nginx-ingress ingress-nginx/ingress-nginx \\
+helm install ${nginx_helm_release_name} ingress-nginx/ingress-nginx \\
   --set controller.publishService.enabled=true \\
 ` + (addons.ingressEveryNode ?
         `  --set controller.kind=DaemonSet \\
@@ -468,9 +473,10 @@ helm install nginx-ingress ingress-nginx/ingress-nginx \\
       (addons.monitor === 'oss' ?
         `  --set controller.metrics.enabled=true \\
   --set controller.metrics.serviceMonitor.enabled=true \\
-  --set controller.metrics.serviceMonitor.namespace=monitoring \\
+  --set controller.metrics.serviceMonitor.namespace=${promethous_namespace} \\
+  --set controller.metrics.serviceMonitor.additionalLabels.release=${promethous_helm_release_name}
 ` : '') +
-      `  --namespace ingress-basic` : '') +
+      `  --namespace ${nginx_namespace}` : '') +
 
     (addons.dnsZoneId ? `\n\n# Install external-dns
 kubectl create secret generic azure-config-file --from-file=azure.json=/dev/stdin<<EOF
