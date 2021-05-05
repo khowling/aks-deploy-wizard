@@ -474,7 +474,7 @@ helm install ${nginx_helm_release_name} ingress-nginx/ingress-nginx \\
         `  --set controller.metrics.enabled=true \\
   --set controller.metrics.serviceMonitor.enabled=true \\
   --set controller.metrics.serviceMonitor.namespace=${promethous_namespace} \\
-  --set controller.metrics.serviceMonitor.additionalLabels.release=${promethous_helm_release_name}
+  --set controller.metrics.serviceMonitor.additionalLabels.release=${promethous_helm_release_name} \\
 ` : '') +
       `  --namespace ${nginx_namespace}` : '') +
 
