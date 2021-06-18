@@ -59,7 +59,7 @@ export default function ({ cluster, addons, net, updateFn, invalidArray }) {
                 />
                 {addons.azurepolicy !== 'none' &&
                     <MessageBar messageBarType={addons.azurepolicy === 'audit' ? MessageBarType.success : MessageBarType.blocked} styles={{ root: { marginLeft: '50px', width: '700px' } }}>
-                        The template will automatically assign and <b>{addons.azurepolicy}</b> the following Policies:
+                        The template will automatically assign and <b>{addons.azurepolicy}</b> the following <Link target="_target" href="https://github.com/Azure/azure-policy/blob/master/built-in-policies/policySetDefinitions/Kubernetes/Kubernetes_PSPBaselineStandard.json">Policies</Link>:
                         <ul>
                             <li>Do not allow privileged containers in Kubernetes cluster</li>
                             <li>Kubernetes cluster pods should only use approved host network and port range</li>

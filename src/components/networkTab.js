@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Separator, TextField, Dropdown, DirectionalHint, Callout, Stack, Text, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
+import { Image, ImageFit, Link, Separator, TextField, Dropdown, DirectionalHint, Callout, Stack, Text, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
 import { set_imm_del, adv_stackstyle } from './common'
 
 const columnProps = {
@@ -106,79 +106,115 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
             <Separator className="notopmargin" />
 
             <Stack.Item>
-                <Label>Default or Custom VNET</Label>
-                <div ref={_calloutTarget1} style={{ marginTop: 0 }}>
-                    <ChoiceGroup
-                        styles={{ root: { marginLeft: '50px' } }}
-                        selectedKey={net.vnet_opt}
-                        onClick={() => setCallout1(true)}
-                        onChange={(ev, { key }) => updateFn("vnet_opt", key)}
-                        options={[
-                            {
-                                key: 'default',
-                                iconProps: { iconName: 'CubeShape' },
-                                text: 'Default Networking'
-                            },
-                            {
-                                key: 'custom',
-                                iconProps: { iconName: 'CityNext' }, // SplitObject
-                                text: 'Custom Networking'
-                            },
-                            {
-                                key: 'byo',
-                                disabled: !featureFlag,
-                                iconProps: { iconName: 'WebAppBuilderFragment' }, // SplitObject
-                                text: 'BYO VNET (TBC)'
-                            }
-                        ]}
-                    />
-                </div>
+                <Stack horizontal>
+                    <Stack.Item>
+                        <Label>Default or Custom VNET</Label>
+                        <div ref={_calloutTarget1} style={{ marginTop: 0 }}>
+                            <ChoiceGroup
+                                styles={{ root: { marginLeft: '50px' } }}
+                                selectedKey={net.vnet_opt}
+                                onClick={() => setCallout1(true)}
+                                onChange={(ev, { key }) => updateFn("vnet_opt", key)}
+                                options={[
+                                    {
+                                        key: 'default',
+                                        iconProps: { iconName: 'CubeShape' },
+                                        text: 'Default Networking'
+                                    },
+                                    {
+                                        key: 'custom',
+                                        iconProps: { iconName: 'CityNext' }, // SplitObject
+                                        text: 'Custom Networking'
+                                    },
+                                    {
+                                        key: 'byo',
+                                        disabled: !featureFlag,
+                                        iconProps: { iconName: 'WebAppBuilderFragment' }, // SplitObject
+                                        text: 'BYO VNET (TBC)'
+                                    }
+                                ]}
+                            />
+                        </div>
+                    </Stack.Item>
+                    <Stack.Item>
+                        {callout1 && net.vnet_opt === 'default' && (
+                            <Callout
+                                className="ms-CalloutExample-callout"
+                                target={_calloutTarget1}
+                                directionalHint={DirectionalHint.leftCenter}
+                                isBeakVisible={true}
+                                gapSpace={10}
+                                setInitialFocus={true}
+                                onDismiss={() => setCallout1(false)}>
+
+                                <MessageBar messageBarType={MessageBarType.info}>Default - Fully Managed Networking</MessageBar>
+                                <div style={{ padding: "10px", maxWidth: "450px" }}>
+                                    <Text >
+                                        Select this option if you <Text style={{ fontWeight: "bold" }} > don't</Text> require any custom IP settings, so you are not peering with other VNETs or On-Premises networks
+                                        This is the simplest AKS deployment to operate, it provides a <Text style={{ fontWeight: "bold" }} > managed</Text> network setup, including:
+                                    </Text>
+                                    <ul>
+                                        <li>New Dedicated VNET with private IP range for your agents nodes</li>
+                                        <li>Container Networking (default: CNI)</li>
+                                        <li>Standard LoadBalancer for kubernetes services with outbound rule for internet access</li>
+                                    </ul>
+                                </div>
+                            </Callout>
+                        )}
+
+
+                        {callout1 && net.vnet_opt === 'custom' && (
+                            <Callout
+                                className="ms-CalloutExample-callout"
+                                target={_calloutTarget1}
+                                directionalHint={DirectionalHint.leftCenter}
+                                isBeakVisible={true}
+                                gapSpace={10}
+                                setInitialFocus={true}
+                                onDismiss={() => setCallout1(false)}>
+
+                                <MessageBar messageBarType={MessageBarType.warning}>Custom Networking - Advanced Setup</MessageBar>
+                                <div style={{ padding: "10px", maxWidth: "500px" }}>
+                                    <Text >
+                                        Select this option if you will you would like the helper to create a new VNET with specific ranges, use this option if you need to:
+                                        <ul>
+                                            <li>Connect your AKS network with another networks</li>
+                                            <li>You will be VNET peering or using an Expressroute or VPN Gateway</li>
+                                        </ul>
+                                    </Text>
+                                </div>
+                            </Callout>
+                        )}
+
+                        {callout1 && net.vnet_opt === 'byo' && (
+                            <Callout
+                                className="ms-CalloutExample-callout"
+                                target={_calloutTarget1}
+                                directionalHint={DirectionalHint.leftCenter}
+                                isBeakVisible={true}
+                                gapSpace={10}
+                                setInitialFocus={true}
+                                onDismiss={() => setCallout1(false)}>
+
+                                <MessageBar messageBarType={MessageBarType.warning}>Bring your own Networking - Advanced Setup</MessageBar>
+                                <div style={{ padding: "10px", maxWidth: "500px" }}>
+                                    <Text >
+                                        Select this option if you will be deploying AKS into an existing network configuration, for example.
+                                    </Text>
+
+                                    <ul>
+                                        <li>If you are implementing the Secure Baseline Architecture <Link target="_" href="https://docs.microsoft.com/azure/architecture/reference-architectures/containers/aks/secure-baseline-aks">here</Link>
+                                            <Image imageFit={ImageFit.CenterContain} width="100%" src="./secure-baseline-architecture.svg" /></li>
+                                        <li>If you will deploy AKS into a pre-existing VNET, managed by a networking team</li>
+                                    </ul>
+                                </div>
+                            </Callout>
+                        )}
+                    </Stack.Item>
+                </Stack>
             </Stack.Item>
 
-            {callout1 && net.vnet_opt === 'default' && (
-                <Callout
-                    className="ms-CalloutExample-callout"
-                    target={_calloutTarget1}
-                    directionalHint={DirectionalHint.leftCenter}
-                    isBeakVisible={true}
-                    gapSpace={10}
-                    setInitialFocus={true}
-                    onDismiss={() => setCallout1(false)}>
 
-                    <MessageBar messageBarType={MessageBarType.info}>Default - Fully Managed Networking</MessageBar>
-                    <div style={{ padding: "10px", maxWidth: "450px" }}>
-                        <Text >
-                            Select this option if you <Text style={{ fontWeight: "bold" }} > don't</Text> require any custom IP settings, so you are not peering with other VNETs or On-Premises networks
-                            This is the simplest AKS deployment to operate, it provides a <Text style={{ fontWeight: "bold" }} > managed</Text> network setup, including:
-                        </Text>
-                        <ul>
-                            <li>New Dedicated VNET with private IP range for your agents nodes</li>
-                            <li>Container Networking (default: CNI)</li>
-                            <li>Standard LoadBalancer for kubernetes services with outbound rule for internet access</li>
-                        </ul>
-                    </div>
-                </Callout>
-            )}
-
-
-            {callout1 && net.vnet_opt === 'custom' && (
-                <Callout
-                    className="ms-CalloutExample-callout"
-                    target={_calloutTarget1}
-                    directionalHint={DirectionalHint.leftCenter}
-                    isBeakVisible={true}
-                    gapSpace={10}
-                    setInitialFocus={true}
-                    onDismiss={() => setCallout1(false)}>
-
-                    <MessageBar messageBarType={MessageBarType.warning}>Custom Networking - Advanced Setup</MessageBar>
-                    <div style={{ padding: "10px", maxWidth: "500px" }}>
-                        <Text >
-                            Select this option if you need to connect your AKS network with another networks, either through VNET peering or a Expressroute or VPN Gateway.
-                        </Text>
-                    </div>
-                </Callout>
-            )}
 
             {net.vnet_opt === 'custom' ?
                 <CustomVNET addons={addons} net={net} updateFn={updateFn} />
