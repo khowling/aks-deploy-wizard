@@ -32,14 +32,15 @@ export default function ({ updateFn, tabValues, invalidArray, invalidTabs }) {
     ...(cluster.apisecurity === "private" && { enablePrivateCluster: "true" }),
     ...(addons.dns && addons.dnsZoneId && { dnsZoneId: addons.dnsZoneId }),
     ...(addons.ingress === "appgw" && { ingressApplicationGateway: "true" }),
-    ...(cluster.upgradeChannel !== "none" && { upgradeChannel: cluster.upgradeChannel })
+    ...(cluster.upgradeChannel !== "none" && { upgradeChannel: cluster.upgradeChannel }),
+    // configure ACR networkRuleSet for vnet access (Service Endpoint)
+    ...(net.serviceEndpointsEnable && net.serviceEndpoints.includes('Microsoft.ContainerRegistry') && addons.registry === 'Premium' && { ACRserviceEndpointFW: apiips_array.length > 0 ? apiips_array[0] : "vnetonly" })
+
   }
 
 
   const preview_params = {
     ...(addons.gitops !== "none" && { gitops: addons.gitops }),
-    // configure ACR networkRuleSet for vnet access (Service Endpoint)
-    ...(net.serviceEndpointsEnable && net.serviceEndpoints.includes('Microsoft.ContainerRegistry') && addons.registry === 'Premium' && { ACRserviceEndpointFW: apiips_array.length > 0 ? apiips_array[0] : "vnetonly" })
   }
 
   const params2CLI = p => Object.keys(p).map(k => ` \\\n\t${k}=${p[k]}`).join('')
@@ -202,7 +203,7 @@ export default function ({ updateFn, tabValues, invalidArray, invalidTabs }) {
       }
 
       <Pivot >
-        <PivotItem headerText="CLI Commands"  >
+        <PivotItem headerText="Provision Environment (CLI)"  >
           <TextField value={deploycmd} rows={deploycmd.split(/\r\n|\r|\n/).length + 1} readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'Monaco, Menlo, Consolas, "Droid Sans Mono", Inconsolata, "Courier New", monospace' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
           <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >
             Open a Linux shell (requires 'az cli' pre-installed), or, open the
@@ -210,42 +211,41 @@ export default function ({ updateFn, tabValues, invalidArray, invalidTabs }) {
             <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell
           </Text>
         </PivotItem>
-        <PivotItem headerText="Parameter File">
-
-          <TextField value={param_file} rows={param_file.split(/\r\n|\r|\n/).length + 1} readOnly={true} label="Parameter file for CI/CD" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline  >
+        <PivotItem headerText="Provision Environment (CI/CD)">
+          <TextField value={"TBC"} rows={5} readOnly={true} label="Github action" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline  >
+          </TextField>
+          <TextField value={param_file} rows={param_file.split(/\r\n|\r|\n/).length + 1} readOnly={true} label="Parameter file" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline  >
           </TextField>
 
         </PivotItem>
+
+        <PivotItem headerText="Post Configuration">
+          {addons.gitops === 'none' ?
+            <Stack>
+              <Label>Run these commands to install the requeted kubernetes packages into your cluster</Label>
+              <MessageBar>Once available, we will switch to using the gitops addon here, to assure that your clusters get their source of truth from the defined git repo</MessageBar>
+              <TextField readOnly={true} label="Commands (requires helm)" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={postscript.split(/\r\n|\r|\n/).length + 1} value={postscript} />
+            </Stack>
+            :
+            <Stack>
+
+              <TextField readOnly={true} label="While Gitops is in preview, run this manually" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`az k8sconfiguration create
+        --name cluster-config 
+        --cluster-name ${deploy.clusterName}    
+        --resource-group ${deploy.clusterName}-rg     
+        --operator-instance-name flux     
+        --operator-namespace cluster-config     
+        --enable-helm-operator     
+        --operator-params='--git-readonly --git-path=cluster-config'     
+        --repository-url git://github.com/khowling/aks-deploy-arm.git     
+        --scope cluster     
+        --helm-operator-params='--set helm.versions=v3'     
+        --cluster-type managedclusters`} />
+
+            </Stack>
+          }
+        </PivotItem>
       </Pivot>
-
-
-      <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Next Steps</b></Separator>
-
-      {addons.gitops === 'none' ?
-        <Stack>
-          <Label>Run these commands to install the requeted kubernetes packages into your cluster</Label>
-          <MessageBar>Once available, we will switch to using the gitops addon here, to assure that your clusters get their source of truth from the defined git repo</MessageBar>
-          <TextField readOnly={true} label="Commands (requires helm)" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={postscript.split(/\r\n|\r|\n/).length + 1} value={postscript} />
-        </Stack>
-        :
-        <Stack>
-
-          <TextField readOnly={true} label="While Gitops is in preview, run this manually" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={6} value={`az k8sconfiguration create
-       --name cluster-config 
-       --cluster-name ${deploy.clusterName}    
-       --resource-group ${deploy.clusterName}-rg     
-       --operator-instance-name flux     
-       --operator-namespace cluster-config     
-       --enable-helm-operator     
-       --operator-params='--git-readonly --git-path=cluster-config'     
-       --repository-url git://github.com/khowling/aks-deploy-arm.git     
-       --scope cluster     
-       --helm-operator-params='--set helm.versions=v3'     
-       --cluster-type managedclusters`} />
-
-        </Stack>
-      }
-
     </Stack>
   )
 }
