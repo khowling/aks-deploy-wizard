@@ -1,10 +1,10 @@
 import React from 'react';
 import { TextField, Link, Separator, Dropdown, Stack, Text, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
-import { adv_stackstyle } from './common'
+import { adv_stackstyle, hasError, getError } from './common'
 
 
-export default function ({ cluster, addons, net, updateFn, invalidArray }) {
-
+export default function ({ tabValues, updateFn, invalidArray }) {
+    const { addons, net } = tabValues
     return (
         <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
@@ -121,12 +121,12 @@ export default function ({ cluster, addons, net, updateFn, invalidArray }) {
                             <Checkbox disabled={net.afw} checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications using external-dns (Beta) (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
                             {addons.dns &&
                                 <>
-                                    <TextField disabled={net.afw} value={addons.dnsZoneId} onChange={(ev, v) => updateFn("dnsZoneId", v)} errorMessage={invalidArray.includes('dnsZoneId') ? "Enter valid resourceId" : ""} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
+                                    <TextField disabled={net.afw} value={addons.dnsZoneId} onChange={(ev, v) => updateFn("dnsZoneId", v)} errorMessage={getError(invalidArray, 'dnsZoneId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
 
 
-                                    <Checkbox disabled={invalidArray.includes('dnsZoneId')} checked={addons.certMan} onChange={(ev, v) => updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email" />
+                                    <Checkbox disabled={hasError(invalidArray, 'dnsZoneId')} checked={addons.certMan} onChange={(ev, v) => updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email" />
                                     {addons.certMan &&
-                                        <TextField value={addons.certEmail} onChange={(ev, v) => updateFn("certEmail", v)} errorMessage={invalidArray.includes('certEmail') ? "Enter valid email" : ''} label="Enter mail address for certificate notification:" required />
+                                        <TextField value={addons.certEmail} onChange={(ev, v) => updateFn("certEmail", v)} errorMessage={getError(invalidArray, 'certEmail') ? "Enter valid email" : ''} label="Enter mail address for certificate notification:" required />
                                     }
                                 </>
                             }
@@ -152,8 +152,8 @@ export default function ({ cluster, addons, net, updateFn, invalidArray }) {
                     ]}
                     onChange={(ev, { key }) => updateFn("registry", key)}
                 />
-                {invalidArray.includes('registry') &&
-                    <MessageBar messageBarType={MessageBarType.error}>Premium Teir is required for Service Endpoints & Private Link, either select "Premium", or disable Service Endpoints and Private Link</MessageBar>
+                {hasError(invalidArray, 'registry') &&
+                    <MessageBar messageBarType={MessageBarType.error}>{getError(invalidArray, 'registry')}</MessageBar>
                 }
             </Stack.Item>
 

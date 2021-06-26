@@ -4,7 +4,6 @@
   "private": true,
   "homepage": "/aks-deploy-wizard/",
   "dependencies": {
-    "office-ui-fabric-react": "^7.170.3",
     "react": "^16.14.0",
     "react-dom": "^16.14.0",
     "react-scripts": "3.2.0"
@@ -31,9 +30,7 @@
     ]
   },
   "devDependencies": {
-    "@fluentui/react": "^7.170.3",
-    "@microsoft/applicationinsights-web": "^2.6.3",
-    "@uifabric/icons": "^7.5.23",
-    "@uifabric/react-cards": "^0.115.53"
+    "@fluentui/react": "^8.20.1",
+    "@microsoft/applicationinsights-web": "^2.6.3"
   }
 }

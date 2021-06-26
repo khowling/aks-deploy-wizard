@@ -1,13 +1,11 @@
 import React from 'react';
 import { mergeStyles, TextField, Link, Separator, DropdownMenuItemType, Dropdown, Slider, Stack, Text, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
+import { adv_stackstyle, getError, hasError } from './common'
 
 const optionRootClass = mergeStyles({
     display: 'flex',
     alignItems: 'baseline'
 });
-
-const adv_stackstyle = { root: { border: "1px solid", background: "#fcfcfc", margin: "10px 0", padding: "15px", height: "2000px" } }
-
 
 export const VMs = [
     { key: 'b', text: 'Burstable (dev/test)', itemType: DropdownMenuItemType.Header },
@@ -23,8 +21,8 @@ export const VMs = [
     { key: 'Standard_F2s_v2', text: '2 vCPU,  4 GiB RAM,  16GiB SSD,               (3200 IOPS)', eph: false }
 ]
 
-export default function ({ cluster, updateFn, invalidArray }) {
-
+export default function ({ tabValues, updateFn, invalidArray }) {
+    const { cluster } = tabValues
     return (
         <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
@@ -98,7 +96,9 @@ export default function ({ cluster, updateFn, invalidArray }) {
                                 styles={{ dropdown: { width: "100%" } }}
                             />
 
-                            {invalidArray.includes('osDiskType') && <MessageBar messageBarType={MessageBarType.error}>Youre selected VM cache is not large enough to support Ephemeral. Select 'Managed' or a VM with a larger cache</MessageBar>}
+                            {hasError(invalidArray, 'osDiskType') &&
+                                <MessageBar messageBarType={MessageBarType.error}>{getError(invalidArray, 'osDiskType')}</MessageBar>
+                            }
                             <ChoiceGroup
                                 onChange={(ev, { key }) => updateFn("osDiskType", key)}
                                 selectedKey={cluster.osDiskType}
@@ -221,7 +221,7 @@ export default function ({ cluster, updateFn, invalidArray }) {
                                                     <TextField
                                                         value={cluster.aad_tenant_id}
                                                         onChange={(ev, val) => updateFn("aad_tenant_id", val)}
-                                                        errorMessage={invalidArray.includes('aad_tenant_id') ? "Enter Valid Directory ID" : ""}
+                                                        errorMessage={getError(invalidArray, 'aad_tenant_id')}
                                                         styles={{ root: { marginLeft: 5 } }}
                                                         disabled={props ? !cluster.use_alt_aad : false}
                                                         required placeholder="tenant id" />

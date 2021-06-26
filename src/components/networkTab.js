@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Image, ImageFit, Link, Separator, TextField, Dropdown, DirectionalHint, Callout, Stack, Text, Label, ChoiceGroup, Checkbox, MessageBar, MessageBarType } from '@fluentui/react';
-import { set_imm_del, adv_stackstyle } from './common'
+import { arrayAdd, arrayDel, adv_stackstyle, hasError, getError } from './common'
 
 const columnProps = {
     tokens: { childrenGap: 15 },
@@ -9,22 +9,10 @@ const columnProps = {
 }
 
 
-export default function ({ net, updateFn, addons, cluster, invalidArray }) {
-    const [featureFlag, setFeatureFlag] = useState(false)
+export default function ({ tabValues, updateFn, invalidArray, featureFlag }) {
+    const { net, addons } = tabValues
     const [callout1, setCallout1] = useState(false)
     var _calloutTarget1 = React.createRef()
-
-    useEffect(() => {
-
-        var queryString = window && window.location.search
-        if (queryString) {
-            var match = queryString.match('[?&]feature=([^&]+)')
-            if (match) {
-                setFeatureFlag(true)// = match[1]
-            }
-        }
-    }, [])
-
 
     return (
         <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
@@ -48,8 +36,12 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
             <Separator className="notopmargin" />
 
             <Stack.Item>
-                <Label>Setup Azure firewall for your cluster egress</Label>
-                <Checkbox styles={{ root: { marginLeft: '50px', marginTop: '10 !important' } }} disabled={false} checked={net.afw} onChange={(ev, v) => updateFn("afw", v)} label="Implement Azure Firewall & UDR nexthop" />
+                <Label>Deploy Azure firewall for your cluster egress (Custom VNet Only)</Label>
+                {hasError(invalidArray, 'afw') &&
+                    <MessageBar messageBarType={MessageBarType.error}>{getError(invalidArray, 'afw')}</MessageBar>
+                }
+                <Checkbox styles={{ root: { marginLeft: '50px', marginTop: '10 !important' } }} disabled={false} errorMessage={getError(invalidArray, 'afw')} checked={net.afw} onChange={(ev, v) => updateFn("afw", v)} label="Implement Azure Firewall & UDR nexthop" />
+
             </Stack.Item>
 
             <Separator className="notopmargin" />
@@ -67,10 +59,10 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
                             required={true}
                             placeholder="Select options"
                             label="Select the Azure Dependencies you would like to secure to your AKS VNET"
-                            selectedKeys={Array.from(net.serviceEndpoints)}
+                            selectedKeys={net.serviceEndpoints}
                             // eslint-disable-next-line react/jsx-no-bind
                             onChange={(ev, { key, selected }) => {
-                                updateFn("serviceEndpoints", selected ? net.serviceEndpoints.add(key) : set_imm_del(net.serviceEndpoints, key))
+                                updateFn("serviceEndpoints", selected ? arrayAdd(net.serviceEndpoints, key) : arrayDel(net.serviceEndpoints, key))
                             }}
                             multiSelect
                             options={[
@@ -86,10 +78,6 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
                                 { key: 'Microsoft.Web', text: 'Microsoft.Web' }
                             ]}
                         />
-                        {invalidArray.includes('serviceEndpoints') &&
-                            <MessageBar messageBarType={MessageBarType.error}>Please select at least 1 dependent service, or de-select "Enable Service Endpoints"</MessageBar>
-                        }
-
                     </Stack>
 
                 }
@@ -134,6 +122,9 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
                                     }
                                 ]}
                             />
+                            {hasError(invalidArray, 'vnet_opt') &&
+                                <MessageBar messageBarType={MessageBarType.error}>{getError(invalidArray, 'vnet_opt')}</MessageBar>
+                            }
                         </div>
                     </Stack.Item>
                     <Stack.Item>
@@ -225,16 +216,41 @@ export default function ({ net, updateFn, addons, cluster, invalidArray }) {
     )
 }
 
+function PodServiceNetwork({ net, updateFn }) {
+    return (
+        <Stack {...columnProps}>
+            <Label>Kubernetes Networking Configuration</Label>
+            <Stack.Item align="start">
+                <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin === 'kubenet' ? net.podCidr : "IPs from subnet"} />
+            </Stack.Item>
+            <Stack.Item align="start">
+                <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
+                <MessageBar messageBarType={MessageBarType.warning}>Address space that isn't in use elsewhere in your network environment <a target="_targ" href="https://docs.microsoft.com/en-us/azure/aks/configure-kubenet#create-an-aks-cluster-in-the-virtual-network">docs</a></MessageBar>
+            </Stack.Item>
+
+        </Stack>
+    )
+}
+
 function BYOVNET({ net, addons, updateFn, invalidArray }) {
     return (
+
         <Stack styles={adv_stackstyle}>
+            <Label>Kubernetes Network Configration</Label>
+            <Stack horizontal tokens={{ childrenGap: 50 }} styles={{ root: { width: 650 } }}>
+                <Stack {...columnProps}></Stack>
+                <PodServiceNetwork net={net} updateFn={updateFn} />
+
+            </Stack>
+            <Label>Bring your Own VNET and Subnets</Label>
             <MessageBar>Get your user subnet by running <Label>az network vnet subnet show --vnet-name `{'<net name>'}` -g `{'<vnet rg>'}` -n `{'<subnet name>'}` --query "id"</Label></MessageBar>
-            <TextField value={net.byoAKSSubnetId} onChange={(ev, v) => updateFn("byoAKSSubnetId", v)} errorMessage={invalidArray.includes('byoAKSSubnetId') ? "Enter valid resourceId" : ""} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your existing AKS Nodes subnet ResourceId</Text>} />
+            <TextField value={net.byoAKSSubnetId} onChange={(ev, v) => updateFn("byoAKSSubnetId", v)} errorMessage={getError(invalidArray, 'byoAKSSubnetId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your existing AKS Nodes subnet ResourceId</Text>} />
 
             <Separator className="notopmargin" />
 
 
-            <TextField disabled={addons.ingress !== 'appgw'} value={net.byoAGWSubnetId} onChange={(ev, v) => updateFn("byoAGWSubnetId", v)} errorMessage={invalidArray.includes('byoAGWSubnetId') ? "Enter valid resourceId" : ""} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your existing Application Gateway subnet ResourceId</Text>} />
+            <TextField disabled={addons.ingress !== 'appgw'} value={net.byoAGWSubnetId} onChange={(ev, v) => updateFn("byoAGWSubnetId", v)} errorMessage={getError(invalidArray, 'byoAGWSubnetId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your existing Application Gateway subnet ResourceId</Text>} />
+            <MessageBar messageBarType={MessageBarType.warning}>Ensure your Application Gateway subnet meets these requirements <Link href="https://docs.microsoft.com/en-us/azure/application-gateway/configuration-infrastructure#size-of-the-subnet">here</Link></MessageBar>
 
         </Stack>
     )
@@ -268,16 +284,7 @@ function CustomVNET({ net, addons, updateFn }) {
                     </Stack.Item>
                 </Stack>
 
-                <Stack {...columnProps}>
-                    <Label>Kubernetes Networking Configuration</Label>
-                    <Stack.Item align="start">
-                        <TextField prefix="Cidr" label="POD Network" disabled={net.networkPlugin !== 'kubenet'} onChange={(ev, val) => updateFn("podCidr", val)} value={net.networkPlugin === 'kubenet' ? net.podCidr : "IPs from subnet"} />
-                    </Stack.Item>
-                    <Stack.Item align="start">
-                        <TextField prefix="Cidr" label="Service Network" onChange={(ev, val) => updateFn("service", val)} value={net.service} />
-                    </Stack.Item>
-
-                </Stack>
+                <PodServiceNetwork net={net} updateFn={updateFn} />
             </Stack>
         </Stack>
     )

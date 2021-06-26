@@ -1,52 +1,60 @@
 import React from 'react';
-import { Image, TextField, Link, Separator, DropdownMenuItemType, Dropdown, Stack, Text, Toggle, Label, MessageBar, MessageBarType } from '@fluentui/react';
+import { Pivot, PivotItem, Image, TextField, Link, Separator, DropdownMenuItemType, Dropdown, Stack, Text, Toggle, Label, MessageBar, MessageBarType } from '@fluentui/react';
 
-import { adv_stackstyle } from './common'
+import { adv_stackstyle, getError } from './common'
 
-export default function ({ updateFn, net, addons, cluster, deploy, invalidArray, allok }) {
-  /*
-    let deploy_version = "v1.6"
-    var queryString = window && window.location.search
-    if (queryString) {
-      var match = queryString.match('[?&]v=([^&]+)')
-      if (match) {
-        deploy_version = match[1]
-      }
-    }
-  */
+export default function ({ updateFn, tabValues, invalidArray, invalidTabs }) {
+  const { net, addons, cluster, deploy } = tabValues
+  const allok = !(invalidTabs && invalidTabs.length > 0)
   const apiips_array = deploy.apiips.split(',').filter(x => x.trim())
-  const armcmd = `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \n` +
-    `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` +
-    ` \\\n   resourceName=${deploy.clusterName}` +
-    ` \\\n   kubernetesVersion=${process.env.REACT_APP_K8S_VERSION}` +
-    ` \\\n   agentCount=${cluster.count}` +
-    (cluster.vmSize !== 'default' ? ` \\\n   agentVMSize=${cluster.vmSize}` : '') +
-    (cluster.autoscale ? ` \\\n   agentCountMax=${cluster.maxCount}` : '') +
-    (cluster.osDiskType === 'Managed' ? ` \\\n   osDiskType=${cluster.osDiskType} ${(cluster.osDiskSizeGB > 0 ? `osDiskSizeGB=${cluster.osDiskSizeGB}` : '')}` : '') +
-    (net.vnet_opt === 'custom' ? ' \\\n   custom_vnet=true' : '') +
-    (net.vnet_opt === 'byo' ? ` \\\n   byoAKSSubnetId=${net.byoAKSSubnetId}` : '') +
-    (net.vnet_opt === 'byo' && addons.ingress === 'appgw' ? ` \\\n   byoAGWSubnetId=${net.byoAGWSubnetId}` : '') +
-    (cluster.enable_aad ? ` \\\n   enable_aad=true ${(cluster.enableAzureRBAC === false && cluster.aad_tenant_id ? `aad_tenant_id=${cluster.aad_tenant_id}` : '')}` : '') +
-    (cluster.enable_aad && cluster.enableAzureRBAC ? ` \\\n   enableAzureRBAC=true ${(cluster.adminprincipleid ? `adminprincipleid=${cluster.adminprincipleid}` : '')}` : '') +
-    (addons.registry !== 'none' ? ` \\\n   registries_sku=${addons.registry}` : '') +
-    (net.afw ? ` \\\n   azureFirewalls=true` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 ? ` \\\n   serviceEndpoints="${JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"')}"` : '') +
-    (addons.monitor === 'aci' ? ` \\\n   omsagent=true retentionInDays=${addons.retentionInDays}` : "") +
-    (addons.networkPolicy !== 'none' ? ` \\\n   networkPolicy=${addons.networkPolicy}` : '') +
-    (addons.azurepolicy !== 'none' ? ` \\\n   azurepolicy=${addons.azurepolicy}` : '') +
-    (net.networkPlugin !== 'azure' ? ` \\\n   networkPlugin=${net.networkPlugin}` : '') +
-    (cluster.availabilityZones === 'yes' ? ` \\\n   availabilityZones="${JSON.stringify(['1', '2', '3']).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
-    (cluster.apisecurity === 'whitelist' && apiips_array.length > 0 ? ` \\\n   authorizedIPRanges="${JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"')}"` : '') +
-    (cluster.apisecurity === 'private' ? ` \\\n   enablePrivateCluster=true` : '') +
-    (addons.dns && addons.dnsZoneId ? ` \\\n   dnsZoneId=${addons.dnsZoneId}` : '') +
-    (addons.ingress === 'appgw' ? ` \\\n   ingressApplicationGateway=true` : '')
 
-  const preview_features =
-    (cluster.upgradeChannel !== 'none' ? ` \\\n   upgradeChannel=${cluster.upgradeChannel}` : '') +
-    (addons.gitops !== 'none' ? ` \\\n   gitops=${addons.gitops}` : '') +
-    (net.serviceEndpointsEnable && net.serviceEndpoints.has('Microsoft.ContainerRegistry') && addons.registry === 'Premium' ? ` \\\n   ACRserviceEndpointFW=${apiips_array.length > 0 ? apiips_array[0] : 'vnetonly'}` : '')
+  const params = {
+    resourceName: deploy.clusterName,
+    kubernetesVersion: deploy.kubernetesVersion,
+    agentCount: cluster.count,
+    ...(cluster.vmSize !== "default" && { agentVMSize: cluster.vmSize }),
+    ...(cluster.autoscale && { agentCountMax: cluster.maxCount }),
+    ...(cluster.osDiskType === "Managed" && { osDiskType: cluster.osDiskType, ...(cluster.osDiskSizeGB > 0 && { osDiskSizeGB: cluster.osDiskSizeGB }) }),
+    ...(net.vnet_opt === "custom" && { custom_vnet: "true" }),
+    ...(net.vnet_opt === "byo" && { byoAKSSubnetId: net.byoAKSSubnetId }),
+    ...(net.vnet_opt === "byo" && addons.ingress === 'appgw' && { byoAGWSubnetId: net.byoAGWSubnetId }),
+    ...(cluster.enable_aad && { enable_aad: "true", ...(cluster.enableAzureRBAC === false && cluster.aad_tenant_id && { aad_tenant_id: cluster.aad_tenant_id }) }),
+    ...(cluster.enable_aad && cluster.enableAzureRBAC && { enableAzureRBAC: "true", ...(cluster.adminprincipleid && { adminprincipleid: cluster.adminprincipleid }) }),
+    ...(addons.registry !== "none" && { registries_sku: addons.registry }),
+    ...(net.afw && { azureFirewalls: "true" }),
+    ...(net.serviceEndpointsEnable && net.serviceEndpoints.size > 0 && { serviceEndpoints: JSON.stringify(Array.from(net.serviceEndpoints).map(s => { return { service: s } })).replaceAll('"', '\\"') }),
+    ...(addons.monitor === "aci" && { omsagent: "true", retentionInDays: addons.retentionInDays }),
+    ...(addons.networkPolicy !== "none" && { networkPolicy: addons.networkPolicy }),
+    ...(addons.azurepolicy !== "none" && { azurepolicy: addons.azurepolicy }),
+    ...(net.networkPlugin !== "azure" && { networkPlugin: net.networkPlugin }),
+    ...(cluster.availabilityZones === "yes" && { availabilityZones: JSON.stringify(['1', '2', '3']).replaceAll(' ', '').replaceAll('"', '\\"') }),
+    ...(cluster.apisecurity === "whitelist" && apiips_array.length > 0 && { authorizedIPRanges: JSON.stringify(apiips_array).replaceAll(' ', '').replaceAll('"', '\\"') }),
+    ...(cluster.apisecurity === "private" && { enablePrivateCluster: "true" }),
+    ...(addons.dns && addons.dnsZoneId && { dnsZoneId: addons.dnsZoneId }),
+    ...(addons.ingress === "appgw" && { ingressApplicationGateway: "true" }),
+    ...(cluster.upgradeChannel !== "none" && { upgradeChannel: cluster.upgradeChannel })
+  }
 
-  const deploycmd = armcmd + (deploy.disablePreviews ? '' : preview_features)
+
+  const preview_params = {
+    ...(addons.gitops !== "none" && { gitops: addons.gitops }),
+    // configure ACR networkRuleSet for vnet access (Service Endpoint)
+    ...(net.serviceEndpointsEnable && net.serviceEndpoints.includes('Microsoft.ContainerRegistry') && addons.registry === 'Premium' && { ACRserviceEndpointFW: apiips_array.length > 0 ? apiips_array[0] : "vnetonly" })
+  }
+
+  const params2CLI = p => Object.keys(p).map(k => ` \\\n\t${k}=${p[k]}`).join('')
+  const params2file = p => Object.keys(p).reduce((a, c) => { return { ...a, parameters: { ...a.parameters, [c]: { value: p[c] } } } }, {
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {}
+  })
+  const deploycmd =
+    `# Create Resource Group \n` +
+    `az group create -l ${deploy.location} -n ${deploy.clusterName}-rg \n\n` +
+    `# Deploy template with in-line paramters \n` +
+    `az deployment group create -g ${deploy.clusterName}-rg  ${process.env.REACT_APP_AZ_TEMPLATE_ARG} --parameters` + params2CLI(params) + (deploy.disablePreviews ? '' : params2CLI(preview_params))
+  const param_file = JSON.stringify(params2file(params), null, 2)
+
 
   const postscript_woraround = `# Workaround to enabling the appgw addon with custom vnet
   az aks enable-addons -n ${deploy.clusterName} -g ${deploy.clusterName}-rg -a ingress-appgw --appgw-id $(az network application-gateway show -g ${deploy.clusterName}-rg -n ${deploy.clusterName}-appgw --query id -o tsv)
@@ -130,10 +138,15 @@ export default function ({ updateFn, net, addons, cluster, deploy, invalidArray,
   return (
 
     <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
+      {!allok &&
+        <MessageBar messageBarType={MessageBarType.severeWarning}>
+          <Text >Configration not complete, please correct the tabs with the warning symbol <b>({invalidTabs.join(' & ')})</b> before deploying</Text>
+        </MessageBar>
+      }
       <Stack horizontal styles={{ root: { width: "100%" } }} tokens={{ childrenGap: 150 }}>
         <Stack styles={{ root: { width: "300px" } }}>
 
-          <TextField label="Cluster Name" onChange={(ev, val) => updateFn('clusterName', val)} required errorMessage={invalidArray.includes('clusterName') ? "Enter valid cluster name" : ""} value={deploy.clusterName} />
+          <TextField label="Cluster Name" onChange={(ev, val) => updateFn('clusterName', val)} required errorMessage={getError(invalidArray, 'clusterName')} value={deploy.clusterName} />
           <Dropdown
             label="Location"
             selectedKey={deploy.location}
@@ -157,10 +170,10 @@ export default function ({ updateFn, net, addons, cluster, deploy, invalidArray,
           />
         </Stack>
         <Stack tokens={{ childrenGap: 20 }} styles={{ root: { width: "450px" } }}>
-          <TextField label="Kubernetes version" readOnly={true} disabled={true} value={process.env.REACT_APP_K8S_VERSION} />
+          <TextField label="Kubernetes version" readOnly={false} disabled={false} required value={deploy.kubernetesVersion} onChange={(ev, val) => updateFn('kubernetesVersion', val)} />
 
           <Stack.Item styles={{ root: { display: (cluster.apisecurity !== "whitelist" ? "none" : "block") } }} >
-            <TextField label="Initial api server whitelisted IPs/CIDRs  (',' seperated)" errorMessage={invalidArray.includes('apiips') ? "Enter an IP/CIDR, or disable API Security in 'Cluster Details' tab" : ""} onChange={(ev, val) => updateFn("apiips", val)} value={deploy.apiips} required={cluster.apisecurity === "whitelist"} />
+            <TextField label="Initial api server whitelisted IPs/CIDRs  (',' seperated)" errorMessage={getError(invalidArray, 'apiips')} onChange={(ev, val) => updateFn("apiips", val)} value={deploy.apiips} required={cluster.apisecurity === "whitelist"} />
           </Stack.Item>
 
         </Stack>
@@ -180,22 +193,31 @@ export default function ({ updateFn, net, addons, cluster, deploy, invalidArray,
 
       <Separator styles={{ root: { marginTop: '30px !important' } }}><div style={{ display: "flex", alignItems: 'center', }}><b style={{ marginRight: '10px' }}>Deploy Cluster</b><Image src="./bicep.png" /> <p style={{ marginLeft: '10px' }}>powered by Bicep</p></div> </Separator>
 
-      {preview_features.length > 0 &&
+      {Object.keys(preview_params).length > 0 &&
         <MessageBar messageBarType={MessageBarType.warning}>
-          <Text >Your deployment contains Preview features: <b>{preview_features}</b>, Ensure you have registered for ALL these previews before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
+          <Text >Your deployment contains Preview features: <b>{Object.keys(preview_params).join(',')}</b>, Ensure you have registered for ALL these previews before running the script, <Link target="_pv" href="https://github.com/Azure/AKS/blob/master/previews.md">see here</Link>, or disable preview features here</Text>
           <Toggle styles={{ root: { marginTop: "10px" } }} onText='preview enabled' offText="preview disabled" checked={!deploy.disablePreviews} onChange={(ev, checked) => updateFn("disablePreviews", !checked)} />
         </MessageBar>
 
       }
-      {/* (addons.monitor === 'oss' || addons.ingress === 'nginx') &&
-          <MessageBar messageBarType={MessageBarType.warning}>
-            <Text >Your deployment contains Opensource community solutions, these solutions are not managed by Microsoft, you will be responsible for managing the lifecycle of these solutions</Text>
-          </MessageBar>
-  
-      */}
-      <TextField readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline rows={deploycmd.split(/\r\n|\r|\n/).length + 1} value={deploycmd} errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
 
-      <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >Open a Linux shell (requires 'az cli' pre-installed), or, open the <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>. <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell</Text>
+      <Pivot >
+        <PivotItem headerText="CLI Commands"  >
+          <TextField value={deploycmd} rows={deploycmd.split(/\r\n|\r|\n/).length + 1} readOnly={true} label="Commands to deploy your fully operational environment" styles={{ root: { fontFamily: 'Monaco, Menlo, Consolas, "Droid Sans Mono", Inconsolata, "Courier New", monospace' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline errorMessage={!allok ? "Please complete all items that need attention before running script" : ""} />
+          <Text styles={{ root: { marginTop: "2px !important" } }} variant="medium" >
+            Open a Linux shell (requires 'az cli' pre-installed), or, open the
+            <Link target="_cs" href="http://shell.azure.com/">Azure Cloud Shell</Link>.
+            <Text variant="medium" style={{ fontWeight: "bold" }}>Paste the commands</Text> into the shell
+          </Text>
+        </PivotItem>
+        <PivotItem headerText="Parameter File">
+
+          <TextField value={param_file} rows={param_file.split(/\r\n|\r|\n/).length + 1} readOnly={true} label="Parameter file for CI/CD" styles={{ root: { fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace!important' }, field: { backgroundColor: 'lightgrey', lineHeight: '21px' } }} multiline  >
+          </TextField>
+
+        </PivotItem>
+      </Pivot>
+
 
       <Separator styles={{ root: { marginTop: '30px !important' } }}><b>Next Steps</b></Separator>
 
