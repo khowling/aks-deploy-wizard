@@ -42,7 +42,7 @@ export default function ({ updateFn, tabValues, invalidArray, invalidTabs }) {
     ...(net.serviceEndpointsEnable && net.serviceEndpoints.includes('Microsoft.ContainerRegistry') && addons.registry === 'Premium' && { ACRserviceEndpointFW: apiips_array.length > 0 ? apiips_array[0] : "vnetonly" }),
     ...(addons.gitops !== "none" && { gitops: addons.gitops }),
     // azure-keyvault-secrets-provider
-    ...(addons.csisecret !== "none" && { ...(addons.csisecret === 'akvNew' && { createKV: "true" }) })
+    ...(addons.csisecret !== "none" && { azureKeyvaultSecretsProvider: true, ...(addons.csisecret === 'akvNew' && { createKV: "true" }) })
   }
 
   const params2CLI = p => Object.keys(p).map(k => ` \\\n\t${k}=${p[k]}`).join('')
