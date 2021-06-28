@@ -1,0 +1,21 @@
+{
+  "files": {
+    "main.css": "/aks-deploy-wizard/static/css/main.249515cf.chunk.css",
+    "main.js": "/aks-deploy-wizard/static/js/main.1c2f7481.chunk.js",
+    "main.js.map": "/aks-deploy-wizard/static/js/main.1c2f7481.chunk.js.map",
+    "runtime-main.js": "/aks-deploy-wizard/static/js/runtime-main.8209470e.js",
+    "runtime-main.js.map": "/aks-deploy-wizard/static/js/runtime-main.8209470e.js.map",
+    "static/js/2.dcc6a85b.chunk.js": "/aks-deploy-wizard/static/js/2.dcc6a85b.chunk.js",
+    "static/js/2.dcc6a85b.chunk.js.map": "/aks-deploy-wizard/static/js/2.dcc6a85b.chunk.js.map",
+    "index.html": "/aks-deploy-wizard/index.html",
+    "precache-manifest.0f76c10f212e1b69178339bf870c933e.js": "/aks-deploy-wizard/precache-manifest.0f76c10f212e1b69178339bf870c933e.js",
+    "service-worker.js": "/aks-deploy-wizard/service-worker.js",
+    "static/css/main.249515cf.chunk.css.map": "/aks-deploy-wizard/static/css/main.249515cf.chunk.css.map"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.8209470e.js",
+    "static/js/2.dcc6a85b.chunk.js",
+    "static/css/main.249515cf.chunk.css",
+    "static/js/main.1c2f7481.chunk.js"
+  ]
+}
