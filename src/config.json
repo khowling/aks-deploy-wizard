@@ -11,7 +11,7 @@
             "location": "WestEurope",
             "apiips": "",
             "demoapp": false,
-            "disablePreviews": true
+            "disablePreviews": false
         },
         "cluster": {
             "apisecurity": "none",
@@ -44,6 +44,8 @@
             "podscale": false,
             "monitor": "none",
             "retentionInDays": 30,
+            "csisecret": "none",
+            "kvId": "",
             "gitops": "none"
         },
         "net": {
@@ -131,7 +133,7 @@
                 {
                     "key": "managed",
                     "default": true,
-                    "title": "I want a managed environment (Recommended for most)",
+                    "title": "I want a managed environment",
                     "description": {
                         "title": "I'd like my cluster to be auto-managed by Azure for upgrades and scalling, and use Azure provided managed addons to create an full environment with the minimum of operational requirements",
                         "bulets": [
@@ -235,7 +237,7 @@
                 {
                     "key": "normal",
                     "default": true,
-                    "title": "Custer with additional security controls (Recommended for most)",
+                    "title": "Custer with additional security controls",
                     "description": {
                         "title": "Good option for implmenting recommended minimum security controls for regular environments",
                         "bulets": [
@@ -338,6 +340,10 @@
                             {
                                 "description": "Restrict egress with Azure firewall",
                                 "linksrc": "https://docs.microsoft.com/en-us/azure/aks/limit-egress-traffic#restrict-egress-traffic-using-azure-firewall"
+                            },
+                            {
+                                "description": "Store Kubernetes Secrets in Azure Keyvault,",
+                                "linksrc": "https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver"
                             }
                         ]
                     },
@@ -372,7 +378,8 @@
                                     "set": "none"
                                 }
                             ],
-                            "azurepolicy": "deny"
+                            "azurepolicy": "deny",
+                            "csisecret": "akvNew"
                         },
                         "net": {
                             "serviceEndpointsEnable": false,
@@ -419,6 +426,10 @@
                             {
                                 "description": "East-West traffic control",
                                 "linksrc": "https://docs.microsoft.com/en-gb/azure/aks/use-network-policies"
+                            },
+                            {
+                                "description": "Store Kubernetes Secrets in Azure Keyvault,",
+                                "linksrc": "https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver"
                             }
                         ]
                     },
@@ -440,7 +451,8 @@
                             "registry": "Basic",
                             "azurepolicy": "deny",
                             "ingress": "appgw",
-                            "monitor": "aci"
+                            "monitor": "aci",
+                            "csisecret": "akvNew"
                         },
                         "net": {
                             "serviceEndpointsEnable": false,
@@ -499,6 +511,10 @@
                             {
                                 "description": "Restrict egress with Azure firewall (provisioned & configured seperatly)",
                                 "linksrc": "https://docs.microsoft.com/en-us/azure/aks/limit-egress-traffic#restrict-egress-traffic-using-azure-firewall"
+                            },
+                            {
+                                "description": "Store Kubernetes Secrets in Azure Keyvault,",
+                                "linksrc": "https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver"
                             }
                         ]
                     },
@@ -520,7 +536,8 @@
                             "registry": "Premium",
                             "azurepolicy": "deny",
                             "ingress": "appgw",
-                            "monitor": "aci"
+                            "monitor": "aci",
+                            "csisecret": "akvNew"
                         },
                         "net": {
                             "serviceEndpointsEnable": false,

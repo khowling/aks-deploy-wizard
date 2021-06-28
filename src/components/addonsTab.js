@@ -4,7 +4,7 @@ import { adv_stackstyle, hasError, getError } from './common'
 
 
 export default function ({ tabValues, updateFn, invalidArray }) {
-    const { addons, net } = tabValues
+    const { addons, net, deploy } = tabValues
     return (
         <Stack tokens={{ childrenGap: 15 }} styles={adv_stackstyle}>
 
@@ -95,7 +95,7 @@ export default function ({ tabValues, updateFn, invalidArray }) {
                     styles={{ root: { marginLeft: '50px' } }}
                     selectedKey={addons.ingress}
                     options={[
-                        { key: 'none', text: 'No, I will configure my own solution' },
+                        { key: 'none', text: 'No, I dont need a Layer7 proxy, or I will configure my own solution' },
                         { key: 'nginx', text: 'Yes, deploy nginx in the cluster to expose my apps to the internet (nginx ingress controller)' },
                         { key: 'appgw', text: 'Yes, I want a Azure Managed Application Gateway with WAF protection' }
                     ]}
@@ -116,12 +116,12 @@ export default function ({ tabValues, updateFn, invalidArray }) {
                         <Checkbox checked={addons.ingressEveryNode} onChange={(ev, v) => updateFn("ingressEveryNode", v)} label={<Text>Run nginx on every node (deploy as Daemonset)</Text>} />
                     }
 
-                    {addons.ingress === "nginx" &&
+                    {(addons.ingress === "nginx" || addons.ingress === "appgw") &&
                         <>
-                            <Checkbox disabled={net.afw} checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications using external-dns (Beta) (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
+                            <Checkbox checked={addons.dns} onChange={(ev, v) => updateFn("dns", v)} label={<Text>Create FQDN URLs for your applications using external-dns (Beta) (requires <Text style={{ fontWeight: "bold" }}>Azure DNS Zone</Text> - <Link href="https://docs.microsoft.com/en-us/azure/dns/dns-getstarted-portal#create-a-dns-zone" target="_t1">how to create</Link>)</Text>} />
                             {addons.dns &&
                                 <>
-                                    <TextField disabled={net.afw} value={addons.dnsZoneId} onChange={(ev, v) => updateFn("dnsZoneId", v)} errorMessage={getError(invalidArray, 'dnsZoneId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
+                                    <TextField value={addons.dnsZoneId} onChange={(ev, v) => updateFn("dnsZoneId", v)} errorMessage={getError(invalidArray, 'dnsZoneId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure DNS Zone ResourceId <Link target="_t2" href="https://ms.portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.Network%2FdnsZones">find it here</Link></Text>} />
 
 
                                     <Checkbox disabled={hasError(invalidArray, 'dnsZoneId')} checked={addons.certMan} onChange={(ev, v) => updateFn("certMan", v)} label="Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email" />
@@ -153,11 +153,41 @@ export default function ({ tabValues, updateFn, invalidArray }) {
                     onChange={(ev, { key }) => updateFn("registry", key)}
                 />
                 {hasError(invalidArray, 'registry') &&
-                    <MessageBar messageBarType={MessageBarType.error}>{getError(invalidArray, 'registry')}</MessageBar>
+                    <MessageBar styles={{ root: { marginLeft: '50px', width: '700px' } }} messageBarType={MessageBarType.error}>{getError(invalidArray, 'registry')}</MessageBar>
+                }
+                {net.serviceEndpointsEnable && net.serviceEndpoints.includes('Microsoft.ContainerRegistry') && addons.registry === 'Premium' &&
+                    <MessageBar styles={{ root: { marginLeft: '50px', width: '700px' } }} messageBarType={MessageBarType.warning}>As you have selected Container Registry in Networking Service Endpoint, the templte will only Allow traffic to your Registry from the AKS Subnet, and your specified IP addresses <b>{deploy.apiips.split(',')}</b> (<Link href="https://docs.microsoft.com/en-us/azure/container-registry/container-registry-vnet">docs</Link>) *** Preview feature</MessageBar>
                 }
             </Stack.Item>
 
             <Separator className="notopmargin" />
+
+            <Stack.Item align="start">
+                <Label required={true}>
+                    Store Kubernetes Secrets in Azure Keyvault, using AKS Managed Identity (**Preview)
+                    (<a target="_new" href="https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver">docs</a>)
+                </Label>
+                <ChoiceGroup
+                    styles={{ root: { marginLeft: '50px' } }}
+                    selectedKey={addons.csisecret}
+                    options={[
+                        { key: 'none', text: 'No, I am happy to use the default kuberentes secret storage, or I will configure my own solution' },
+                        { key: 'akvExist', text: 'Yes, store secrets in an existing KeyVault & enable Secrets Store CSI Driver' },
+                        { key: 'akvNew', text: 'Yes, provision a new Azure KeyVault & enable Secrets Store CSI Driver' }
+                    ]}
+                    onChange={(ev, { key }) => updateFn("csisecret", key)}
+                />
+            </Stack.Item>
+
+            <Stack.Item align="center" styles={{ root: { minWidth: '700px', display: (addons.csisecret === "none" ? "none" : "block") } }} >
+                <MessageBar messageBarType={MessageBarType.warning}>Ensure you register for this preview feature <Link href="https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver#register-the-aks-azurekeyvaultsecretsprovider-preview-feature">here</Link></MessageBar>
+                <Stack tokens={{ childrenGap: 15 }}>
+                    {addons.csisecret === "akvExist" &&
+                        <TextField value={addons.kvId} onChange={(ev, v) => updateFn("kvId", v)} errorMessage={getError(invalidArray, 'kvId')} required placeholder="Resource Id" label={<Text style={{ fontWeight: 600 }}>Enter your Azure Key Vault Resource Id</Text>} />
+                    }
+                </Stack>
+            </Stack.Item>
+
             {/* 
         <ChoiceGroup
           label='Enable gitops'
