@@ -1,3 +1,9 @@
+# Moved
+
+This project has moved to https://github.com/Azure/Aks-Construction
+
+Please go to the new repo to get the latest version!
+
 
 ## Add to generate AKS deployment template paramters
 
